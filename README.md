@@ -277,6 +277,11 @@ LazyNote 把笔记、任务、事件统一为“原子（Atom）”，避免多�
 - 提交规范（Conventional Commits）与 PR 模板。
 - Issue 模板（功能、缺陷、架构决策提案）。
 
+当前可直接使用：
+
+- Windows 极简上手：`docs/development/windows-quickstart.md`
+- Windows 详细开发说明：`docs/development/windows.md`
+
 欢迎基于 `docs/init` 报告继续提交架构评审与实现 PR。
 
 ## 许可证

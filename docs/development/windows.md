@@ -4,6 +4,8 @@
 
 Document reproducible local setup and diagnostics for Windows contributors.
 
+先用最短路径跑通：`docs/development/windows-quickstart.md`
+
 ## Toolchain (to confirm)
 
 - Flutter: `3.41.0`
