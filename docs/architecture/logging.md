@@ -151,11 +151,26 @@ Constraints:
 - Failures are surfaced as user-readable diagnostics (string error).
 - Core business operations must not depend on logging success.
 
-## 12. Implementation Notes (for follow-up PR)
+## 12. Implementation Notes (Current)
 
-- Rust side: use structured logging and rolling appender.
-- Flutter side: compute `log_dir`, call `init_logging(level, log_dir)` once at startup.
-- Add a basic diagnostics screen to export logs and view logging status.
+- Rust side:
+  - structured logging is enabled
+  - rolling appender is enabled (`10MB x 5`)
+  - startup + core operations emit metadata-only events
+- Flutter side:
+  - computes `log_dir` via `path_provider`
+  - calls `init_logging(level, log_dir)` during startup bootstrap
+  - shows a non-fatal startup hint when logging bootstrap fails
+- Workbench diagnostics:
+  - inline live log panel is available in the split-shell workbench
+  - panel supports refresh, copy visible logs, open log folder, and periodic polling
+  - panel keeps mounted while left-side placeholder pages switch
+
+See also: `docs/releases/v0.1/prs/PR-0017-workbench-debug-logs.md`.
+
+### Remaining gap (v0.1)
+
+- Zip export flow for bug reports is not implemented yet.
 
 ## 13. Implementation Rollout Plan (Staged)
 

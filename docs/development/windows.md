@@ -79,7 +79,8 @@ Docker：仅用于 Rust 工具链/CI（可选）
 
 - `Open Log Folder` on Windows:
   - `explorer.exe` may return non-zero even when folder opens successfully.
-  - Current implementation treats this as non-fatal on Windows.
+  - Current implementation treats `stderr` output or a missing target directory as failure.
+  - For compatibility, non-zero without `stderr` is still accepted as success.
 
 - Console warning:
   - `[ERROR:flutter/lib/ui/window/platform_configuration.cc] Reported frame time is older than the last one; clamping`

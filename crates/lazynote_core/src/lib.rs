@@ -1,19 +1,30 @@
 //! Core domain logic for LazyNote.
 //! This crate is the single source of truth for business invariants.
 
+/// Database open/migration APIs.
 pub mod db;
+/// Structured logging initialization and status APIs.
 pub mod logging;
+/// Canonical Atom data model.
 pub mod model;
+/// Persistence contracts and SQLite repository implementations.
 pub mod repo;
+/// FTS5 search APIs.
 pub mod search;
+/// Use-case orchestration services.
 pub mod service;
 
+/// Re-export logging entry points for FFI/UI layers.
 pub use logging::{default_log_level, init_logging, logging_status};
+/// Re-export canonical Atom model types.
 pub use model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
+/// Re-export repository contracts and SQLite implementation.
 pub use repo::atom_repo::{
     AtomListQuery, AtomRepository, RepoError, RepoResult, SqliteAtomRepository,
 };
+/// Re-export search query/result models and search entry point.
 pub use search::fts::{search_all, SearchError, SearchHit, SearchQuery, SearchResult};
+/// Re-export atom service facade.
 pub use service::atom_service::AtomService;
 
 /// Minimal health-check API for early integration.
