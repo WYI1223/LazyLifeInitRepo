@@ -6,6 +6,9 @@
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:lazynote_flutter/core/bindings/frb_generated.dart';
 
+// These functions are ignored because they are not marked as `pub`: `atom_type_label`, `failure`, `normalize_entry_limit`, `resolve_entry_db_path`, `success`, `to_entry_search_item`, `with_atom_service`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
+
 /// Minimal health-check API for FRB smoke integration.
 ///
 /// # FFI contract
@@ -24,9 +27,148 @@ String coreVersion() => RustLib.instance.api.crateApiCoreVersion();
 
 /// Initializes Rust core logging once per process.
 ///
+/// Input semantics:
+/// - `level`: one of `trace|debug|info|warn|error` (case-insensitive).
+/// - `log_dir`: absolute directory path where rolling logs are written.
+///
 /// # FFI contract
 /// - Sync call; may perform small file-system setup work.
-/// - Safe to call repeatedly with the same `log_dir` (idempotent).
+/// - Safe to call repeatedly with the same `level + log_dir` (idempotent).
+/// - Reconfiguration attempts with different level or directory return error.
 /// - Never panics; returns empty string on success and error message on failure.
 String initLogging({required String level, required String logDir}) =>
     RustLib.instance.api.crateApiInitLogging(level: level, logDir: logDir);
+
+/// Searches single-entry text using entry-level defaults.
+///
+/// # FFI contract
+/// - Sync call, DB-backed execution.
+/// - Never panics.
+/// - Returns deterministic envelope with applied limit.
+EntrySearchResponse entrySearch({required String text, int? limit}) =>
+    RustLib.instance.api.crateApiEntrySearch(text: text, limit: limit);
+
+/// Creates a note from single-entry command flow.
+///
+/// # FFI contract
+/// - Sync call, DB-backed execution.
+/// - Never panics.
+/// - Returns operation result and created atom ID on success.
+EntryActionResponse entryCreateNote({required String content}) =>
+    RustLib.instance.api.crateApiEntryCreateNote(content: content);
+
+/// Creates a task from single-entry command flow.
+///
+/// # FFI contract
+/// - Sync call, DB-backed execution.
+/// - Never panics.
+/// - Returns operation result and created atom ID on success.
+EntryActionResponse entryCreateTask({required String content}) =>
+    RustLib.instance.api.crateApiEntryCreateTask(content: content);
+
+/// Schedules an event from single-entry command flow.
+///
+/// # FFI contract
+/// - Sync call, DB-backed execution.
+/// - Accepts point (`end_epoch_ms=None`) and range (`Some(end)`) shapes.
+/// - Never panics.
+/// - Returns operation result and created atom ID on success.
+EntryActionResponse entrySchedule({
+  required String title,
+  required PlatformInt64 startEpochMs,
+  PlatformInt64? endEpochMs,
+}) => RustLib.instance.api.crateApiEntrySchedule(
+  title: title,
+  startEpochMs: startEpochMs,
+  endEpochMs: endEpochMs,
+);
+
+/// Generic action response envelope for single-entry command flow.
+class EntryActionResponse {
+  /// Whether operation succeeded.
+  final bool ok;
+
+  /// Optional created atom ID.
+  final String? atomId;
+
+  /// Human-readable response message for diagnostics/UI.
+  final String message;
+
+  const EntryActionResponse({
+    required this.ok,
+    this.atomId,
+    required this.message,
+  });
+
+  @override
+  int get hashCode => ok.hashCode ^ atomId.hashCode ^ message.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EntryActionResponse &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          atomId == other.atomId &&
+          message == other.message;
+}
+
+/// Search item returned by single-entry search API.
+class EntrySearchItem {
+  /// Stable atom ID in string form.
+  final String atomId;
+
+  /// Atom projection kind (`note|task|event`).
+  final String kind;
+
+  /// Short snippet summary for result display.
+  final String snippet;
+
+  const EntrySearchItem({
+    required this.atomId,
+    required this.kind,
+    required this.snippet,
+  });
+
+  @override
+  int get hashCode => atomId.hashCode ^ kind.hashCode ^ snippet.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EntrySearchItem &&
+          runtimeType == other.runtimeType &&
+          atomId == other.atomId &&
+          kind == other.kind &&
+          snippet == other.snippet;
+}
+
+/// Search response envelope for single-entry search flow.
+class EntrySearchResponse {
+  /// Search results (empty when no hits or scaffold mode).
+  final List<EntrySearchItem> items;
+
+  /// Human-readable response message for diagnostics.
+  final String message;
+
+  /// Effective applied search limit.
+  final int appliedLimit;
+
+  const EntrySearchResponse({
+    required this.items,
+    required this.message,
+    required this.appliedLimit,
+  });
+
+  @override
+  int get hashCode => items.hashCode ^ message.hashCode ^ appliedLimit.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is EntrySearchResponse &&
+          runtimeType == other.runtimeType &&
+          items == other.items &&
+          message == other.message &&
+          appliedLimit == other.appliedLimit;
+}

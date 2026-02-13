@@ -1,7 +1,7 @@
 # PR-0009A-entry-ffi-surface
 
 - Proposed title: `feat(ffi): add entry use-case surface for search and command actions`
-- Status: In Progress
+- Status: Completed
 
 ## Goal
 
@@ -60,9 +60,9 @@ All FFI exports must include `FFI contract` rustdoc sections.
 
 ## Acceptance Criteria
 
-- [ ] API contract is documented and stable.
-- [ ] Core logic and tests pass.
-- [ ] No storage internals leaked via FFI.
+- [x] API contract is documented and stable.
+- [x] Core logic and tests pass.
+- [x] No storage internals leaked via FFI.
 
 ## Progress Notes
 
@@ -80,7 +80,14 @@ Phase 1 (completed):
   - `cargo clippy -p lazynote_core -p lazynote_ffi -- -D warnings`
   - `cargo test -p lazynote_core -p lazynote_ffi`
 
-Phase 2 (next):
+Phase 2 (completed):
 
-- Replace scaffold behavior with real DB-backed execution wiring.
-- Map real core search/CRUD results into FFI DTOs.
+- `entry_search` now executes real core `search_all` with default limit normalization.
+- `entry_create_note`, `entry_create_task`, and `entry_schedule` now execute real core service operations.
+- FFI now resolves a real SQLite path (`LAZYNOTE_DB_PATH` override, temp-file default) and opens migrated DB per call.
+- Added tests for:
+  - search hit retrieval after create
+  - task default `todo` persistence
+  - schedule point success
+  - schedule reversed range rejection
+- Regenerated FRB bindings and verified Flutter side checks/tests.
