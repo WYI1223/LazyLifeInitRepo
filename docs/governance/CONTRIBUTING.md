@@ -59,6 +59,7 @@ PR 描述至少包含：
 合并前应满足：
 
 - CI 通过（至少 lint/test/build）
+- API 合约门禁通过（若改动合约文件，必须同步更新 `docs/api/*` 与 `docs/governance/API_COMPATIBILITY.md`）
 - 对应测试或验证步骤可复现
 - 行为变化已更新文档
 - 版本相关改动已更新 `CHANGELOG.md`（如适用）

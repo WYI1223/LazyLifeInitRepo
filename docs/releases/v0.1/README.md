@@ -35,6 +35,7 @@ The original PR list is valid. We applied these optimizations:
 - PR0008, PR0009A, PR0009B, PR0009C, PR0009D, PR0010
 - PR0011, PR0012, PR0013
 - PR0014, PR0015, PR0016
+- PR0017, PR0018
 
 ## PR Specs
 
@@ -56,6 +57,7 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0009B` entry parser/state + Workbench-integrated Single Entry panel
 - Completed: `PR-0009C` realtime search flow (`onChanged` search + result list rendering + stale-response guard + startup DB-path readiness hardening)
 - Completed: `PR-0009D` command execution flow (`new note/task/schedule`)
+- Completed: `PR-0018` API contract docs guard (CI gate for contract/doc sync)
 - Next: `PR-0010` notes + tags feature flow
 
 Execution note:

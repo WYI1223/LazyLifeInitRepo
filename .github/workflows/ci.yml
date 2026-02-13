@@ -6,6 +6,47 @@ on:
   pull_request:
 
 jobs:
+  api_contract_docs_guard:
+    name: API Contract Docs Guard
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce API docs sync
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_sha="${{ github.event.pull_request.base.sha }}"
+          head_sha="${{ github.event.pull_request.head.sha }}"
+          changed_files="$(git diff --name-only "$base_sha" "$head_sha")"
+
+          echo "Changed files:"
+          echo "$changed_files"
+
+          contract_pattern='^(crates/lazynote_ffi/src/api\.rs|apps/lazynote_flutter/lib/core/bindings/api\.dart|apps/lazynote_flutter/lib/core/bindings/frb_generated\.dart|apps/lazynote_flutter/lib/core/bindings/frb_generated\.io\.dart)$'
+
+          if echo "$changed_files" | grep -Eq "$contract_pattern"; then
+            echo "API contract change detected."
+
+            if ! echo "$changed_files" | grep -Eq '^docs/api/'; then
+              echo "::error::API contract files changed but docs/api/* was not updated."
+              exit 1
+            fi
+
+            if ! echo "$changed_files" | grep -Fxq 'docs/governance/API_COMPATIBILITY.md'; then
+              echo "::error::API contract files changed but docs/governance/API_COMPATIBILITY.md was not updated."
+              exit 1
+            fi
+
+            echo "API docs guard passed."
+          else
+            echo "No API contract changes detected."
+          fi
+
   flutter_windows:
     name: Flutter (Windows)
     runs-on: windows-latest

@@ -282,6 +282,8 @@ LazyNote 把笔记、任务、事件统一为“原子（Atom）”，避免多�
 - Windows 极简上手：`docs/development/windows-quickstart.md`
 - Windows 详细开发说明：`docs/development/windows.md`
 - PR-0007 搜索复现手册：`docs/development/windows-pr0007-search-smoke.md`
+- API 合约总览：`docs/api/README.md`
+- API 兼容策略：`docs/governance/API_COMPATIBILITY.md`
 
 欢迎基于 `docs/init` 报告继续提交架构评审与实现 PR。
 
