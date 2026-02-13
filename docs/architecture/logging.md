@@ -156,3 +156,65 @@ Constraints:
 - Rust side: use structured logging and rolling appender.
 - Flutter side: compute `log_dir`, call `init_logging(level, log_dir)` once at startup.
 - Add a basic diagnostics screen to export logs and view logging status.
+
+## 13. Implementation Rollout Plan (Staged)
+
+为降低工具链风险（特别是 FRB codegen / Flutter daemon 卡死），v0.1 采用三阶段落地：
+
+### Phase A: Core-only logging (no FRB/codegen changes)
+
+Scope:
+
+- Implement `init_logging(level, log_dir)` in `lazynote_core`.
+- Add rolling policy (`10MB x 5`) and panic hook logging.
+- Add key event logs in core paths:
+  - `db_open` / `db_migrate_*`
+  - `atom_create` / `atom_update` / `atom_soft_delete`
+  - `search`
+
+Validation:
+
+- `cd crates && cargo check -p lazynote_core`
+- `cd crates && cargo test -p lazynote_core`
+
+Notes:
+
+- Phase A must not depend on Flutter toolchain readiness.
+
+### Phase B: FFI surface for logging init (codegen isolated)
+
+Scope:
+
+- Expose `init_logging(level, log_dir)` from `lazynote_ffi`.
+- Regenerate FRB binding artifacts as a standalone step.
+
+Validation:
+
+- `cd crates && cargo check -p lazynote_ffi`
+- FRB generated files are updated and compile cleanly.
+
+Notes:
+
+- If CI/runner repeatedly times out on codegen, run this phase locally first, then commit generated artifacts.
+
+### Phase C: Flutter bootstrap integration
+
+Scope:
+
+- In Flutter startup, compute log directory and call FFI `init_logging`.
+- Show non-fatal init error in diagnostics UI (do not block app launch).
+
+Validation:
+
+- `cd apps/lazynote_flutter && flutter analyze`
+- `cd apps/lazynote_flutter && flutter test`
+- `flutter run -d windows` startup remains stable.
+
+Notes:
+
+- Logging init failure must not prevent `runApp`.
+
+### Rollback policy
+
+- If any phase becomes unstable, rollback only that phase and keep earlier phases merged.
+- Never bundle all three phases into one commit.
