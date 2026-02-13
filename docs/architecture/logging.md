@@ -31,11 +31,13 @@
 
 ### Example path (Windows)
 
-- `%APPDATA%/LazyNote/logs`
+- `%APPDATA%/LazyLife/logs`
 
 ### Path contract (v0.1)
 
-- Flutter should resolve an app data base directory (for example, via `getApplicationSupportDirectory()`).
+- Flutter should resolve the unified app root directory first:
+  - Windows: `%APPDATA%/LazyLife/`
+  - fallback: `<app_support>/LazyLife/`
 - Flutter appends `logs/` and passes the absolute path to Rust.
 
 ### File naming (recommended)

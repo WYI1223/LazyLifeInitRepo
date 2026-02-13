@@ -74,6 +74,10 @@ Docker：仅用于 Rust 工具链/CI（可选）
 - Flutter 启动时会优先探测 workspace 动态库路径：
   - `../../crates/target/release/`
   - `../../crates/lazynote_ffi/target/release/` (backward compatible)
+- 本地运行时文件统一落到 `%APPDATA%\\LazyLife\\`：
+  - logs: `%APPDATA%\\LazyLife\\logs\\`
+  - settings: `%APPDATA%\\LazyLife\\settings.json`
+  - entry db: `%APPDATA%\\LazyLife\\data\\lazynote_entry.sqlite3`
 
 ## Troubleshooting (Known)
 

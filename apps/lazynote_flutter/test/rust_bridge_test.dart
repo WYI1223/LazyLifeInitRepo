@@ -85,10 +85,15 @@ void main() {
     RustBridge.resetForTesting();
     RustBridge.candidateLibraryPathsOverride = const [];
 
-    var dirCalls = 0;
-    RustBridge.applicationSupportDirectoryResolver = () async {
-      dirCalls += 1;
-      return Directory.systemTemp;
+    var dbPathCalls = 0;
+    var logDirCalls = 0;
+    RustBridge.entryDbPathResolver = () async {
+      dbPathCalls += 1;
+      return '${Directory.systemTemp.path}${Platform.pathSeparator}data${Platform.pathSeparator}entry.sqlite3';
+    };
+    RustBridge.logDirPathResolver = () async {
+      logDirCalls += 1;
+      return '${Directory.systemTemp.path}${Platform.pathSeparator}logs';
     };
 
     var initLoggingCalls = 0;
@@ -110,7 +115,8 @@ void main() {
     ];
 
     final snapshots = await Future.wait(futures);
-    expect(dirCalls, 1);
+    expect(dbPathCalls, 1);
+    expect(logDirCalls, 1);
     expect(configureCalls, 1);
     expect(initLoggingCalls, 1);
     expect(snapshots.every((snapshot) => snapshot.isSuccess), isTrue);
@@ -120,11 +126,11 @@ void main() {
     RustBridge.resetForTesting();
     RustBridge.candidateLibraryPathsOverride = const [];
 
-    var dirCalls = 0;
+    var dbPathCalls = 0;
     var configureCalls = 0;
-    RustBridge.applicationSupportDirectoryResolver = () async {
-      dirCalls += 1;
-      return Directory.systemTemp;
+    RustBridge.entryDbPathResolver = () async {
+      dbPathCalls += 1;
+      return '${Directory.systemTemp.path}${Platform.pathSeparator}data${Platform.pathSeparator}entry.sqlite3';
     };
     RustBridge.rustLibInit = (_) async {};
     RustBridge.configureEntryDbPathCall = ({required dbPath}) {
@@ -138,7 +144,7 @@ void main() {
       RustBridge.ensureEntryDbPathConfigured(),
     ]);
 
-    expect(dirCalls, 1);
+    expect(dbPathCalls, 1);
     expect(configureCalls, 1);
 
     await RustBridge.ensureEntryDbPathConfigured();
@@ -147,8 +153,10 @@ void main() {
 
   test('bootstrapLogging returns failure snapshot on init error', () async {
     RustBridge.resetForTesting();
-    RustBridge.applicationSupportDirectoryResolver = () async =>
-        Directory.systemTemp;
+    RustBridge.entryDbPathResolver = () async =>
+        '${Directory.systemTemp.path}${Platform.pathSeparator}data${Platform.pathSeparator}entry.sqlite3';
+    RustBridge.logDirPathResolver = () async =>
+        '${Directory.systemTemp.path}${Platform.pathSeparator}logs';
     RustBridge.configureEntryDbPathCall = ({required dbPath}) => '';
     RustBridge.rustLibInit = (_) async {
       throw StateError('ffi init failed');
@@ -163,8 +171,10 @@ void main() {
     'bootstrapLogging returns failure when entry db path config fails',
     () async {
       RustBridge.resetForTesting();
-      RustBridge.applicationSupportDirectoryResolver = () async =>
-          Directory.systemTemp;
+      RustBridge.entryDbPathResolver = () async =>
+          '${Directory.systemTemp.path}${Platform.pathSeparator}data${Platform.pathSeparator}entry.sqlite3';
+      RustBridge.logDirPathResolver = () async =>
+          '${Directory.systemTemp.path}${Platform.pathSeparator}logs';
       RustBridge.rustLibInit = (_) async {};
       RustBridge.configureEntryDbPathCall = ({required dbPath}) =>
           'db path denied';

@@ -109,5 +109,6 @@ Planned next:
 - `docs/architecture/data-model.md`
 - `docs/architecture/sync-protocol.md`
 - `docs/architecture/logging.md`
+- `docs/architecture/settings-config.md`
 - `docs/api/README.md`
 - `docs/governance/API_COMPATIBILITY.md`

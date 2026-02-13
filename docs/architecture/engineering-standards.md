@@ -30,6 +30,13 @@
 - `features/<name>` 之间禁止直接依赖对方内部实现。
 - 共享能力只能通过 `shared/` 或 Core API 访问。
 
+### Rule F: Local runtime files must use unified app root
+
+- 所有用户可写运行时文件必须归档到统一根目录 `LazyLife`。
+- Windows 强制路径：`%APPDATA%/LazyLife/`。
+- 其他平台 fallback：`<app_support>/LazyLife/`。
+- 包括但不限于：`settings.json`、`logs/`、`data/`（本地数据库与缓存）。
+
 ## 2. Code Quality Gates (Mandatory)
 
 ### Rust

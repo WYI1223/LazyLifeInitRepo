@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart' show kReleaseMode, visibleForTesting;
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
 import 'package:lazynote_flutter/core/bindings/frb_generated.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:lazynote_flutter/core/local_paths.dart';
 
 /// Health-check values returned from Rust smoke APIs.
 class RustHealthSnapshot {
@@ -97,8 +97,12 @@ class RustBridge {
       };
 
   @visibleForTesting
-  static Future<Directory> Function() applicationSupportDirectoryResolver =
-      getApplicationSupportDirectory;
+  static Future<String> Function() entryDbPathResolver =
+      LocalPaths.resolveEntryDbPath;
+
+  @visibleForTesting
+  static Future<String> Function() logDirPathResolver =
+      LocalPaths.resolveLogDirPath;
 
   @visibleForTesting
   static String Function() defaultLogLevelResolver = () =>
@@ -146,7 +150,8 @@ class RustBridge {
       }
       return RustLib.init();
     };
-    applicationSupportDirectoryResolver = getApplicationSupportDirectory;
+    entryDbPathResolver = LocalPaths.resolveEntryDbPath;
+    logDirPathResolver = LocalPaths.resolveLogDirPath;
     defaultLogLevelResolver = () => kReleaseMode ? 'info' : 'debug';
     initLoggingCall = ({required String level, required String logDir}) =>
         rust_api.initLogging(level: level, logDir: logDir);
@@ -263,19 +268,11 @@ class RustBridge {
     return future;
   }
 
-  static String _resolveEntryDbPathFromSupportDir(Directory supportDir) {
-    return '${supportDir.path}${Platform.pathSeparator}data${Platform.pathSeparator}lazynote_entry.sqlite3';
-  }
-
   static Future<void> _ensureEntryDbPathConfiguredInternal({
     String? dbPathOverride,
   }) async {
     try {
-      final resolvedDbPath =
-          dbPathOverride ??
-          _resolveEntryDbPathFromSupportDir(
-            await applicationSupportDirectoryResolver(),
-          );
+      final resolvedDbPath = dbPathOverride ?? await entryDbPathResolver();
 
       await init();
       final dbConfigError = configureEntryDbPathCall(dbPath: resolvedDbPath);
@@ -323,13 +320,10 @@ class RustBridge {
 
     RustLoggingInitSnapshot result;
     try {
-      final supportDir = await applicationSupportDirectoryResolver();
       // Why: keep platform path resolution in Flutter and pass resolved path
       // into Rust to avoid platform-specific path guessing in core.
-      resolvedLogDir = Directory(
-        '${supportDir.path}${Platform.pathSeparator}logs',
-      ).path;
-      resolvedDbPath = _resolveEntryDbPathFromSupportDir(supportDir);
+      resolvedLogDir = await logDirPathResolver();
+      resolvedDbPath = await entryDbPathResolver();
 
       await ensureEntryDbPathConfigured(dbPathOverride: resolvedDbPath);
       final initError = initLoggingCall(level: level, logDir: resolvedLogDir);

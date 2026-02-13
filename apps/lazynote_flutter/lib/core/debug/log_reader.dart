@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show visibleForTesting;
-import 'package:path_provider/path_provider.dart';
+import 'package:lazynote_flutter/core/local_paths.dart';
 
 /// Metadata for a discovered local log file.
 class DebugLogFile {
@@ -55,8 +55,8 @@ class DebugLogSnapshot {
 /// Reads local rolling logs for developer diagnostics.
 class LogReader {
   @visibleForTesting
-  static Future<Directory> Function() applicationSupportDirectoryResolver =
-      getApplicationSupportDirectory;
+  static Future<String> Function() logDirPathResolver =
+      LocalPaths.resolveLogDirPath;
 
   @visibleForTesting
   static Future<ProcessResult> Function(String executable, List<String> args)
@@ -81,7 +81,7 @@ class LogReader {
 
   @visibleForTesting
   static void resetForTesting() {
-    applicationSupportDirectoryResolver = getApplicationSupportDirectory;
+    logDirPathResolver = LocalPaths.resolveLogDirPath;
     processRunner = Process.run;
     ensureDirectoryExists = (String path) async {
       final directory = Directory(path);
@@ -94,12 +94,7 @@ class LogReader {
   }
 
   /// Resolves absolute log directory path used by Rust logging.
-  static Future<String> resolveLogDirPath() async {
-    final supportDirectory = await applicationSupportDirectoryResolver();
-    return Directory(
-      '${supportDirectory.path}${Platform.pathSeparator}logs',
-    ).path;
-  }
+  static Future<String> resolveLogDirPath() => logDirPathResolver();
 
   /// Reads newest rolling log file and returns tail lines.
   static Future<DebugLogSnapshot> readLatestTail({int maxLines = 200}) async {

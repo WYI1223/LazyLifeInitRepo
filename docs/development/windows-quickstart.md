@@ -20,6 +20,7 @@ After app startup:
 - Workbench home loads.
 - `Rust Diagnostics` page is reachable.
 - Workbench right panel `Debug Logs (Live)` shows rolling logs and refreshes.
+- Logs are written under `%APPDATA%\\LazyLife\\logs\\`.
 - When opening `Notes/Tasks/Settings/Rust Diagnostics`, the left pane switches while the right logs panel stays mounted.
 - The center splitter can be dragged to resize left/right panes (double-click resets width).
 
