@@ -1,4 +1,4 @@
-use lazynote_core::{Atom, AtomType, TaskStatus};
+use lazynote_core::{Atom, AtomType, AtomValidationError, TaskStatus};
 use uuid::Uuid;
 
 #[test]
@@ -31,7 +31,7 @@ fn soft_delete_and_restore_work() {
 #[test]
 fn atom_serialization_uses_expected_wire_fields() {
     let atom_id = Uuid::parse_str("11111111-2222-4333-8444-555555555555").unwrap();
-    let mut atom = Atom::with_id(atom_id, AtomType::Task, "- [ ] ship PR-0004");
+    let mut atom = Atom::with_id(atom_id, AtomType::Task, "- [ ] ship PR-0004").unwrap();
     atom.task_status = Some(TaskStatus::InProgress);
     atom.event_start = Some(1_700_000_000_000);
     atom.event_end = Some(1_700_000_360_000);
@@ -48,4 +48,47 @@ fn atom_serialization_uses_expected_wire_fields() {
 
     let decoded: Atom = serde_json::from_value(json).unwrap();
     assert_eq!(decoded, atom);
+}
+
+#[test]
+fn with_id_rejects_nil_uuid() {
+    let err = Atom::with_id(Uuid::nil(), AtomType::Note, "invalid").unwrap_err();
+    assert_eq!(err, AtomValidationError::NilUuid);
+}
+
+#[test]
+fn validate_rejects_reversed_event_window() {
+    let mut atom = Atom::new(AtomType::Event, "meeting");
+    atom.event_start = Some(1_700_000_000_000);
+    atom.event_end = Some(1_699_999_999_000);
+
+    let err = atom.validate().unwrap_err();
+    assert_eq!(
+        err,
+        AtomValidationError::InvalidEventWindow {
+            start: 1_700_000_000_000,
+            end: 1_699_999_999_000,
+        }
+    );
+}
+
+#[test]
+fn deserialize_rejects_invalid_event_window() {
+    let value = serde_json::json!({
+        "uuid": "11111111-2222-4333-8444-555555555555",
+        "type": "event",
+        "content": "bad event",
+        "task_status": null,
+        "event_start": 200,
+        "event_end": 100,
+        "hlc_timestamp": null,
+        "is_deleted": false
+    });
+
+    let err = serde_json::from_value::<Atom>(value).unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("event_end (100) must be >= event_start (200)"),
+        "unexpected error: {err}"
+    );
 }

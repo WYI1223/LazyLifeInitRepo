@@ -3,7 +3,7 @@
 
 pub mod model;
 
-pub use model::atom::{Atom, AtomId, AtomType, TaskStatus};
+pub use model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
 
 /// Minimal health-check API for early integration.
 pub fn ping() -> &'static str {

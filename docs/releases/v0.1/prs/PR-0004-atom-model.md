@@ -28,7 +28,8 @@ Implement the unified Atom domain model.
 ## Notes
 - Added `Atom`, `AtomType`, `TaskStatus`, and `AtomId` in `lazynote_core`.
 - Added soft-delete helpers (`soft_delete`, `restore`, `is_active`).
-- Added serialization baseline via `serde` and integration test coverage in `tests/atom_model.rs`.
+- Added validation baseline (`validate`) for nil UUID and event time window invariants.
+- Added serialization baseline via `serde` and integration test coverage in `tests/atom_model.rs`, including invalid deserialization rejection.
 - Reserved `hlc_timestamp` field for later CRDT/HLC work.
 - Verification:
   - `cd crates && cargo fmt --all -- --check`
