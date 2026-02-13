@@ -50,4 +50,5 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0005` SQLite schema + migrations (`open_db` + versioned migrations + DB smoke tests)
 - Completed: `PR-0006` core CRUD (`AtomRepository` + `AtomService` + integration tests)
 - Completed: `PR-0007` FTS5 search (`atoms_fts` + trigger sync + core search API/tests)
-- Next: `PR-0008` UI shell (Windows)
+- Completed: `PR-0008` UI shell (Windows) with Workbench default homepage + placeholder routes
+- Next: `PR-0009` single-entry router
