@@ -37,11 +37,17 @@ const MIGRATIONS: &[Migration] = &[
 
 /// Returns the latest migration version known by this binary.
 pub fn latest_version() -> u32 {
-    MIGRATIONS.last().map_or(0, |migration| migration.version)
+    MIGRATIONS
+        .iter()
+        .map(|migration| migration.version)
+        .max()
+        .unwrap_or(0)
 }
 
 /// Applies all pending migrations on the provided connection.
 pub fn apply_migrations(conn: &mut Connection) -> DbResult<()> {
+    validate_registry(MIGRATIONS)?;
+
     let current_version = current_user_version(conn)?;
     let latest = latest_version();
 
@@ -73,4 +79,59 @@ pub fn apply_migrations(conn: &mut Connection) -> DbResult<()> {
 fn current_user_version(conn: &Connection) -> DbResult<u32> {
     let version = conn.query_row("PRAGMA user_version;", [], |row| row.get::<_, u32>(0))?;
     Ok(version)
+}
+
+fn validate_registry(migrations: &[Migration]) -> DbResult<()> {
+    let mut previous = 0;
+    for migration in migrations {
+        if migration.version == 0 {
+            return Err(DbError::InvalidMigrationRegistry(
+                "migration version must start from 1",
+            ));
+        }
+
+        if migration.version <= previous {
+            return Err(DbError::InvalidMigrationRegistry(
+                "migration versions must be strictly increasing and unique",
+            ));
+        }
+
+        previous = migration.version;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{validate_registry, Migration};
+    use crate::db::DbError;
+
+    #[test]
+    fn registry_rejects_non_increasing_versions() {
+        let migrations = [
+            Migration {
+                version: 1,
+                sql: "SELECT 1;",
+            },
+            Migration {
+                version: 1,
+                sql: "SELECT 1;",
+            },
+        ];
+
+        let err = validate_registry(&migrations).unwrap_err();
+        assert!(matches!(err, DbError::InvalidMigrationRegistry(_)));
+    }
+
+    #[test]
+    fn registry_rejects_zero_version() {
+        let migrations = [Migration {
+            version: 0,
+            sql: "SELECT 1;",
+        }];
+
+        let err = validate_registry(&migrations).unwrap_err();
+        assert!(matches!(err, DbError::InvalidMigrationRegistry(_)));
+    }
 }

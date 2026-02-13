@@ -32,14 +32,18 @@ Make SQLite the canonical local storage with migrations.
 ## Notes
 - Added SQLite bootstrap module with `open_db()` and `open_db_in_memory()`.
 - Added migration registry driven by `PRAGMA user_version`.
+- Added migration registry guards to enforce strictly increasing/unique versions.
 - Added v0.1 baseline migrations:
   - `0001_init.sql` for `atoms`
   - `0002_tags.sql` for `tags` + `atom_tags`
   - `0003_external_mappings.sql` for external provider mapping
+- Removed `CREATE TABLE IF NOT EXISTS` from core migrations to fail fast on schema drift.
 - Added migration tests for:
   - first open applies all migrations
   - opening same DB twice is idempotent
   - opening DB newer than supported schema returns explicit error
+  - schema drift does not silently advance `user_version`
+  - key constraints (`CHECK` / `FOREIGN KEY CASCADE` / `UNIQUE`) are enforced
 - Verification:
   - `cd crates && cargo fmt --all -- --check`
   - `cd crates && cargo clippy --all -- -D warnings`

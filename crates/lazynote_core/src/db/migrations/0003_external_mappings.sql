@@ -7,7 +7,7 @@
 -- Backward compatibility:
 -- - additive schema update on top of 0002_tags.sql.
 
-CREATE TABLE IF NOT EXISTS external_mappings (
+CREATE TABLE external_mappings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     provider TEXT NOT NULL,
     external_id TEXT NOT NULL,

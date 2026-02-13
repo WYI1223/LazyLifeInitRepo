@@ -7,13 +7,13 @@
 -- Backward compatibility:
 -- - additive schema update on top of 0001_init.sql.
 
-CREATE TABLE IF NOT EXISTS tags (
+CREATE TABLE tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL COLLATE NOCASE UNIQUE,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)
 );
 
-CREATE TABLE IF NOT EXISTS atom_tags (
+CREATE TABLE atom_tags (
     atom_uuid TEXT NOT NULL,
     tag_id INTEGER NOT NULL,
     created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000),

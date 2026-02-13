@@ -7,7 +7,7 @@
 -- Backward compatibility:
 -- - baseline schema for v0.1; follow-up migrations should be additive.
 
-CREATE TABLE IF NOT EXISTS atoms (
+CREATE TABLE atoms (
     uuid TEXT PRIMARY KEY NOT NULL,
     type TEXT NOT NULL CHECK (type IN ('note', 'task', 'event')),
     content TEXT NOT NULL,

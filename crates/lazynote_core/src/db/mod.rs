@@ -24,6 +24,7 @@ pub type DbResult<T> = Result<T, DbError>;
 #[derive(Debug)]
 pub enum DbError {
     Sqlite(rusqlite::Error),
+    InvalidMigrationRegistry(&'static str),
     UnsupportedSchemaVersion {
         db_version: u32,
         latest_supported: u32,
@@ -34,6 +35,9 @@ impl Display for DbError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Sqlite(err) => write!(f, "{err}"),
+            Self::InvalidMigrationRegistry(details) => {
+                write!(f, "invalid migration registry: {details}")
+            }
             Self::UnsupportedSchemaVersion {
                 db_version,
                 latest_supported,
@@ -49,6 +53,7 @@ impl Error for DbError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             Self::Sqlite(err) => Some(err),
+            Self::InvalidMigrationRegistry(_) => None,
             Self::UnsupportedSchemaVersion { .. } => None,
         }
     }
