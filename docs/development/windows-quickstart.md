@@ -1,10 +1,10 @@
-# Windows Quickstart (新克隆用户)
+# Windows Quickstart (New Clone)
 
-目标：在刚克隆仓库后，最少命令跑起 Windows 应用并看到 Rust 链路成功。
+Goal: run LazyNote on Windows with the minimum command set.
 
-## 4 条命令
+## Commands
 
-在仓库根目录执行：
+Run these in repository root:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/doctor.ps1 -SkipFlutterDoctor
@@ -13,23 +13,30 @@ cd apps/lazynote_flutter; flutter pub get
 flutter run -d windows
 ```
 
-## 预期输出
+## Expected Result
 
-应用窗口启动后，页面应显示：
+After app startup:
 
-- `Rust bridge connected`
-- `ping: pong`
-- `coreVersion: 0.1.0`
+- Workbench home loads.
+- `Rust Diagnostics` page is reachable.
+- Workbench right panel `Debug Logs (Live)` shows rolling logs and refreshes.
+- When opening `Notes/Tasks/Settings/Rust Diagnostics`, the left pane switches while the right logs panel stays mounted.
+- The center splitter can be dragged to resize left/right panes (double-click resets width).
 
-如果看到 `Failed to load dynamic library`，先关闭应用后执行：
+If you see `Failed to load dynamic library`, build Rust FFI first:
 
 ```powershell
 cd crates
 cargo build -p lazynote_ffi --release
 ```
 
-然后回到 `apps/lazynote_flutter` 再次执行 `flutter run -d windows`。
+Then run again:
 
-## 进阶验证（PR-0007 / FTS5 搜索）
+```powershell
+cd apps/lazynote_flutter
+flutter run -d windows
+```
+
+## Related Smoke Guide
 
 - `docs/development/windows-pr0007-search-smoke.md`

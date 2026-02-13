@@ -51,4 +51,5 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0006` core CRUD (`AtomRepository` + `AtomService` + integration tests)
 - Completed: `PR-0007` FTS5 search (`atoms_fts` + trigger sync + core search API/tests)
 - Completed: `PR-0008` UI shell (Windows) with Workbench default homepage + placeholder routes
+- Completed: `PR-0017` Workbench split-shell with pinned debug logs panel, draggable splitter, and local log tail + copy/open-folder actions
 - Next: `PR-0009` single-entry router

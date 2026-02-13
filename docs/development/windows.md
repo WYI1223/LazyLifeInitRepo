@@ -74,3 +74,14 @@ Docker：仅用于 Rust 工具链/CI（可选）
 - Flutter 启动时会优先探测 workspace 动态库路径：
   - `../../crates/target/release/`
   - `../../crates/lazynote_ffi/target/release/` (backward compatible)
+
+## Troubleshooting (Known)
+
+- `Open Log Folder` on Windows:
+  - `explorer.exe` may return non-zero even when folder opens successfully.
+  - Current implementation treats this as non-fatal on Windows.
+
+- Console warning:
+  - `[ERROR:flutter/lib/ui/window/platform_configuration.cc] Reported frame time is older than the last one; clamping`
+  - Usually appears during resize/drag/rapid repaint.
+  - This is a Flutter Windows engine timing warning and is typically non-fatal.

@@ -1,15 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:lazynote_flutter/core/rust_bridge.dart';
 
-/// Development-only diagnostics page for verifying Rust bridge runtime status.
-class RustDiagnosticsPage extends StatefulWidget {
+/// Standalone diagnostics page wrapper.
+class RustDiagnosticsPage extends StatelessWidget {
   const RustDiagnosticsPage({super.key});
 
   @override
-  State<RustDiagnosticsPage> createState() => _RustDiagnosticsPageState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Rust Diagnostics')),
+      body: const SafeArea(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: RustDiagnosticsContent(),
+        ),
+      ),
+    );
+  }
 }
 
-class _RustDiagnosticsPageState extends State<RustDiagnosticsPage> {
+/// Reusable diagnostics content that can be embedded in Workbench left pane.
+class RustDiagnosticsContent extends StatefulWidget {
+  const RustDiagnosticsContent({super.key});
+
+  @override
+  State<RustDiagnosticsContent> createState() => _RustDiagnosticsContentState();
+}
+
+class _RustDiagnosticsContentState extends State<RustDiagnosticsContent> {
   late Future<RustHealthSnapshot> _healthFuture;
 
   @override
@@ -59,89 +77,69 @@ class _RustDiagnosticsPageState extends State<RustDiagnosticsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Rust Diagnostics')),
-      body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: FutureBuilder<RustHealthSnapshot>(
-              future: _healthFuture,
-              builder: (context, snapshot) {
-                if (snapshot.connectionState != ConnectionState.done) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CircularProgressIndicator(),
-                      const SizedBox(height: 16),
-                      const Text('Initializing Rust bridge...'),
-                      const SizedBox(height: 16),
-                      _buildLoggingStatus(),
-                    ],
-                  );
-                }
+    return FutureBuilder<RustHealthSnapshot>(
+      future: _healthFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text('Initializing Rust bridge...'),
+              const SizedBox(height: 16),
+              _buildLoggingStatus(),
+            ],
+          );
+        }
 
-                if (snapshot.hasError) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        size: 40,
-                        color: Colors.red,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Rust bridge initialization failed',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _buildErrorHint(snapshot.error!),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: _reload,
-                        child: const Text('Retry'),
-                      ),
-                      const SizedBox(height: 16),
-                      _buildLoggingStatus(),
-                    ],
-                  );
-                }
+        if (snapshot.hasError) {
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 40, color: Colors.red),
+              const SizedBox(height: 12),
+              const Text(
+                'Rust bridge initialization failed',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _buildErrorHint(snapshot.error!),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              FilledButton(onPressed: _reload, child: const Text('Retry')),
+              const SizedBox(height: 16),
+              _buildLoggingStatus(),
+            ],
+          );
+        }
 
-                final health = snapshot.data!;
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      size: 40,
-                      color: Colors.green,
-                    ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Rust bridge connected',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    Text('ping: ${health.ping}'),
-                    Text('coreVersion: ${health.coreVersion}'),
-                    const SizedBox(height: 16),
-                    FilledButton(
-                      onPressed: _reload,
-                      child: const Text('Refresh'),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildLoggingStatus(),
-                  ],
-                );
-              },
+        final health = snapshot.data!;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle_outline,
+              size: 40,
+              color: Colors.green,
             ),
-          ),
-        ),
-      ),
+            const SizedBox(height: 12),
+            const Text(
+              'Rust bridge connected',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Text('ping: ${health.ping}'),
+            Text('coreVersion: ${health.coreVersion}'),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _reload, child: const Text('Refresh')),
+            const SizedBox(height: 16),
+            _buildLoggingStatus(),
+          ],
+        );
+      },
     );
   }
 }
