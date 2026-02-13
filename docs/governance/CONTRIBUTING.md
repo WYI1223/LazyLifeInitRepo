@@ -11,6 +11,7 @@
 3. 涉及架构决策时，请同步更新 `docs/architecture/adr/`。
 4. 必须遵循 `docs/architecture/engineering-standards.md`。
 5. 注释与代码可读性必须遵循 `docs/architecture/code-comment-standards.md`。
+6. 涉及 API 合约改动时，必须同步更新 `docs/api/*` 与 `docs/governance/API_COMPATIBILITY.md`。
 
 ## Branch Naming
 
@@ -70,6 +71,7 @@ PR 描述至少包含：
 - 改动开发流程或脚本
 - 改动版本计划或里程碑
 - 改动架构边界或技术决策
+- 改动 FFI/Dart API 合约或错误码语义（更新 `docs/api/*`）
 
 ## Code Style
 

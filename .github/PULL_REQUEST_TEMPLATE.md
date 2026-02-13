@@ -27,6 +27,7 @@ Provide reproducible verification steps.
 
 - [ ] No docs update needed
 - [ ] Updated docs in `docs/`
+- [ ] Updated `docs/api/*` (if API contract / error code changed)
 - [ ] Updated `CHANGELOG.md` (if release-impacting)
 
 ## Checklist
