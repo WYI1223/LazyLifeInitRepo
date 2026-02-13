@@ -1,7 +1,7 @@
 # PR-0009B-entry-parser-state
 
 - Proposed title: `feat(ui): add single-entry parser and state model`
-- Status: Draft
+- Status: In Progress (B1 Completed)
 
 ## Goal
 
@@ -97,6 +97,26 @@ B2 verification:
 
 ## Acceptance Criteria
 
-- [ ] Parser supports locked command grammar.
-- [ ] Router cleanly distinguishes command vs search.
+- [x] Parser supports locked command grammar.
+- [x] Router cleanly distinguishes command vs search.
 - [ ] Error states keep input intact and expose readable messages.
+
+## Progress Notes
+
+B1 completed:
+
+- Added immutable entry state model in `entry_state.dart` with explicit transitions (`toLoading`, `toSuccess`, `toError`, `clearStatus`).
+- Added command parser in `command_parser.dart`:
+  - `> new note <content>`
+  - `> task <content>`
+  - `> schedule <MM/DD/YYYY HH:mm> <title>`
+  - `> schedule <MM/DD/YYYY HH:mm-HH:mm> <title>`
+- Added router in `command_router.dart` with `SearchIntent`, `CommandIntent`, `NoopIntent`, `ParseErrorIntent`.
+- Added tests:
+  - `test/command_parser_test.dart`
+  - `test/command_router_test.dart`
+  - `test/entry_state_test.dart`
+- Verification passed:
+  - `dart format lib test`
+  - `flutter analyze`
+  - `flutter test`
