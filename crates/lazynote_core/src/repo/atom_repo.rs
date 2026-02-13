@@ -14,10 +14,12 @@
 use crate::db::migrations::latest_version;
 use crate::db::DbError;
 use crate::model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
+use log::{error, info, warn};
 use rusqlite::types::Value;
 use rusqlite::{params, params_from_iter, Connection, Row};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::time::Instant;
 use uuid::Uuid;
 
 const ATOM_SELECT_SQL: &str = "SELECT
@@ -172,9 +174,18 @@ impl<'conn> SqliteAtomRepository<'conn> {
 
 impl AtomRepository for SqliteAtomRepository<'_> {
     fn create_atom(&self, atom: &Atom) -> RepoResult<AtomId> {
-        atom.validate()?;
+        let started_at = Instant::now();
+        if let Err(err) = atom.validate() {
+            warn!(
+                "event=atom_create module=repo status=error atom_id={} atom_type={} duration_ms={} error_code=validation_error",
+                atom.uuid,
+                atom_type_to_db(atom.kind),
+                started_at.elapsed().as_millis()
+            );
+            return Err(err.into());
+        }
 
-        self.conn.execute(
+        if let Err(err) = self.conn.execute(
             "INSERT INTO atoms (
                 uuid,
                 type,
@@ -195,15 +206,40 @@ impl AtomRepository for SqliteAtomRepository<'_> {
                 atom.hlc_timestamp.as_deref(),
                 bool_to_int(atom.is_deleted),
             ],
-        )?;
+        ) {
+            error!(
+                "event=atom_create module=repo status=error atom_id={} atom_type={} duration_ms={} error_code=db_write_failed error={}",
+                atom.uuid,
+                atom_type_to_db(atom.kind),
+                started_at.elapsed().as_millis(),
+                err
+            );
+            return Err(err.into());
+        }
+
+        info!(
+            "event=atom_create module=repo status=ok atom_id={} atom_type={} duration_ms={}",
+            atom.uuid,
+            atom_type_to_db(atom.kind),
+            started_at.elapsed().as_millis()
+        );
 
         Ok(atom.uuid)
     }
 
     fn update_atom(&self, atom: &Atom) -> RepoResult<()> {
-        atom.validate()?;
+        let started_at = Instant::now();
+        if let Err(err) = atom.validate() {
+            warn!(
+                "event=atom_update module=repo status=error atom_id={} atom_type={} duration_ms={} error_code=validation_error",
+                atom.uuid,
+                atom_type_to_db(atom.kind),
+                started_at.elapsed().as_millis()
+            );
+            return Err(err.into());
+        }
 
-        let changed = self.conn.execute(
+        let changed = match self.conn.execute(
             "UPDATE atoms
              SET
                 type = ?1,
@@ -225,11 +261,36 @@ impl AtomRepository for SqliteAtomRepository<'_> {
                 bool_to_int(atom.is_deleted),
                 atom.uuid.to_string(),
             ],
-        )?;
+        ) {
+            Ok(changed) => changed,
+            Err(err) => {
+                error!(
+                    "event=atom_update module=repo status=error atom_id={} atom_type={} duration_ms={} error_code=db_write_failed error={}",
+                    atom.uuid,
+                    atom_type_to_db(atom.kind),
+                    started_at.elapsed().as_millis(),
+                    err
+                );
+                return Err(err.into());
+            }
+        };
 
         if changed == 0 {
+            warn!(
+                "event=atom_update module=repo status=error atom_id={} atom_type={} duration_ms={} error_code=not_found",
+                atom.uuid,
+                atom_type_to_db(atom.kind),
+                started_at.elapsed().as_millis()
+            );
             return Err(RepoError::NotFound(atom.uuid));
         }
+
+        info!(
+            "event=atom_update module=repo status=ok atom_id={} atom_type={} duration_ms={}",
+            atom.uuid,
+            atom_type_to_db(atom.kind),
+            started_at.elapsed().as_millis()
+        );
 
         Ok(())
     }
@@ -288,7 +349,8 @@ impl AtomRepository for SqliteAtomRepository<'_> {
     }
 
     fn soft_delete_atom(&self, id: AtomId) -> RepoResult<()> {
-        let changed = self.conn.execute(
+        let started_at = Instant::now();
+        let changed = match self.conn.execute(
             "UPDATE atoms
              SET
                 is_deleted = 1,
@@ -296,16 +358,42 @@ impl AtomRepository for SqliteAtomRepository<'_> {
              WHERE uuid = ?1
                AND is_deleted = 0;",
             [id.to_string()],
-        )?;
+        ) {
+            Ok(changed) => changed,
+            Err(err) => {
+                error!(
+                    "event=atom_soft_delete module=repo status=error atom_id={} duration_ms={} error_code=db_write_failed error={}",
+                    id,
+                    started_at.elapsed().as_millis(),
+                    err
+                );
+                return Err(err.into());
+            }
+        };
 
         if changed > 0 {
+            info!(
+                "event=atom_soft_delete module=repo status=ok atom_id={} already_deleted=false duration_ms={}",
+                id,
+                started_at.elapsed().as_millis()
+            );
             return Ok(());
         }
 
         if atom_exists(self.conn, id)? {
+            info!(
+                "event=atom_soft_delete module=repo status=ok atom_id={} already_deleted=true duration_ms={}",
+                id,
+                started_at.elapsed().as_millis()
+            );
             return Ok(());
         }
 
+        warn!(
+            "event=atom_soft_delete module=repo status=error atom_id={} duration_ms={} error_code=not_found",
+            id,
+            started_at.elapsed().as_millis()
+        );
         Err(RepoError::NotFound(id))
     }
 }

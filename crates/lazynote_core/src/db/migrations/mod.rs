@@ -12,7 +12,9 @@
 //! - docs/releases/v0.1/prs/PR-0005-sqlite-schema-migrations.md
 
 use crate::db::{DbError, DbResult};
+use log::{error, info, warn};
 use rusqlite::Connection;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy)]
 struct Migration {
@@ -49,13 +51,30 @@ pub fn latest_version() -> u32 {
 }
 
 /// Applies all pending migrations on the provided connection.
+///
+/// # Invariants
+/// - Migrations run in strictly increasing version order.
+/// - `PRAGMA user_version` is updated after each successful migration step.
+/// - Migration execution is wrapped in one transaction.
+///
+/// # Errors
+/// - Returns [`DbError::UnsupportedSchemaVersion`] when DB schema is newer than
+///   this binary supports.
+/// - Returns [`DbError::Sqlite`] when any migration step or commit fails.
 pub fn apply_migrations(conn: &mut Connection) -> DbResult<()> {
+    let started_at = Instant::now();
     validate_registry(MIGRATIONS)?;
 
     let current_version = current_user_version(conn)?;
     let latest = latest_version();
 
     if current_version > latest {
+        warn!(
+            "event=db_migrate_done module=db status=error from_version={} to_version={} duration_ms={} error_code=unsupported_schema_version",
+            current_version,
+            latest,
+            started_at.elapsed().as_millis()
+        );
         return Err(DbError::UnsupportedSchemaVersion {
             db_version: current_version,
             latest_supported: latest,
@@ -63,19 +82,81 @@ pub fn apply_migrations(conn: &mut Connection) -> DbResult<()> {
     }
 
     if current_version == latest {
+        info!(
+            "event=db_migrate_done module=db status=ok from_version={} to_version={} applied_count=0 duration_ms={}",
+            current_version,
+            latest,
+            started_at.elapsed().as_millis()
+        );
         return Ok(());
     }
 
+    info!(
+        "event=db_migrate_start module=db status=start from_version={} to_version={}",
+        current_version, latest
+    );
+
     let tx = conn.transaction()?;
+    let mut applied_count = 0u32;
     for migration in MIGRATIONS {
         if migration.version <= current_version {
             continue;
         }
 
-        tx.execute_batch(migration.sql)?;
-        tx.execute_batch(&format!("PRAGMA user_version = {};", migration.version))?;
+        let step_started_at = Instant::now();
+        info!(
+            "event=db_migrate_step_start module=db status=start target_version={}",
+            migration.version
+        );
+
+        tx.execute_batch(migration.sql).map_err(|err| {
+            error!(
+                "event=db_migrate_step_done module=db status=error target_version={} duration_ms={} error_code=migration_sql_failed error={}",
+                migration.version,
+                step_started_at.elapsed().as_millis(),
+                err
+            );
+            DbError::Sqlite(err)
+        })?;
+
+        tx.execute_batch(&format!("PRAGMA user_version = {};", migration.version))
+            .map_err(|err| {
+                error!(
+                    "event=db_migrate_step_done module=db status=error target_version={} duration_ms={} error_code=user_version_update_failed error={}",
+                    migration.version,
+                    step_started_at.elapsed().as_millis(),
+                    err
+                );
+                DbError::Sqlite(err)
+            })?;
+
+        applied_count += 1;
+        info!(
+            "event=db_migrate_step_done module=db status=ok target_version={} duration_ms={}",
+            migration.version,
+            step_started_at.elapsed().as_millis()
+        );
     }
-    tx.commit()?;
+
+    tx.commit().map_err(|err| {
+        error!(
+            "event=db_migrate_done module=db status=error from_version={} to_version={} applied_count={} duration_ms={} error_code=commit_failed error={}",
+            current_version,
+            latest,
+            applied_count,
+            started_at.elapsed().as_millis(),
+            err
+        );
+        DbError::Sqlite(err)
+    })?;
+
+    info!(
+        "event=db_migrate_done module=db status=ok from_version={} to_version={} applied_count={} duration_ms={}",
+        current_version,
+        latest,
+        applied_count,
+        started_at.elapsed().as_millis()
+    );
 
     Ok(())
 }

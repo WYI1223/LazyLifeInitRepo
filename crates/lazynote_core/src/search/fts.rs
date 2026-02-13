@@ -10,10 +10,12 @@
 
 use crate::db::DbError;
 use crate::model::atom::{AtomId, AtomType};
+use log::{error, info};
 use rusqlite::types::Value;
 use rusqlite::{params_from_iter, Connection, Row};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::time::Instant;
 use uuid::Uuid;
 
 /// Result type for search APIs.
@@ -103,12 +105,42 @@ pub struct SearchHit {
 /// Searches atoms via FTS5 and returns ranked results.
 ///
 /// Returns an empty list for blank queries.
+///
+/// # Privacy
+/// - Query text content is never written to logs.
+/// - Logging emits metadata only (`query_len`, `query_terms`, flags, duration).
+///
+/// # Errors
+/// - Returns [`SearchError::InvalidQuery`] for malformed raw FTS syntax.
+/// - Returns [`SearchError::Db`] for SQLite execution failures.
 pub fn search_all(conn: &Connection, query: &SearchQuery) -> SearchResult<Vec<SearchHit>> {
+    let started_at = Instant::now();
+    // Why: only log search metadata to match privacy policy.
+    let query_len = query.text.chars().count();
+    let query_terms = query.text.split_whitespace().count();
+    let has_kind_filter = query.kind.is_some();
+
     let Some(match_expr) = build_match_expression(query)? else {
+        info!(
+            "event=search module=search status=ok hits=0 duration_ms={} query_len={} query_terms={} has_kind_filter={} raw_fts={} reason=empty_query",
+            started_at.elapsed().as_millis(),
+            query_len,
+            query_terms,
+            has_kind_filter,
+            query.raw_fts_syntax
+        );
         return Ok(Vec::new());
     };
 
     if query.limit == 0 {
+        info!(
+            "event=search module=search status=ok hits=0 duration_ms={} query_len={} query_terms={} has_kind_filter={} raw_fts={} reason=zero_limit",
+            started_at.elapsed().as_millis(),
+            query_len,
+            query_terms,
+            has_kind_filter,
+            query.raw_fts_syntax
+        );
         return Ok(Vec::new());
     }
 
@@ -133,17 +165,46 @@ pub fn search_all(conn: &Connection, query: &SearchQuery) -> SearchResult<Vec<Se
     bind_values.push(Value::Integer(i64::from(query.limit)));
 
     let mut stmt = conn.prepare(&sql)?;
-    let mut rows = stmt
-        .query(params_from_iter(bind_values))
-        .map_err(|err| map_query_error(err, &match_expr))?;
+    let mut rows = stmt.query(params_from_iter(bind_values)).map_err(|err| {
+        let mapped = map_query_error(err, &match_expr);
+        error!(
+            "event=search module=search status=error duration_ms={} query_len={} query_terms={} has_kind_filter={} raw_fts={} error_code={}",
+            started_at.elapsed().as_millis(),
+            query_len,
+            query_terms,
+            has_kind_filter,
+            query.raw_fts_syntax,
+            search_error_code(&mapped)
+        );
+        mapped
+    })?;
     let mut hits = Vec::new();
 
-    while let Some(row) = rows
-        .next()
-        .map_err(|err| map_query_error(err, &match_expr))?
-    {
+    while let Some(row) = rows.next().map_err(|err| {
+        let mapped = map_query_error(err, &match_expr);
+        error!(
+            "event=search module=search status=error duration_ms={} query_len={} query_terms={} has_kind_filter={} raw_fts={} error_code={}",
+            started_at.elapsed().as_millis(),
+            query_len,
+            query_terms,
+            has_kind_filter,
+            query.raw_fts_syntax,
+            search_error_code(&mapped)
+        );
+        mapped
+    })? {
         hits.push(parse_search_hit(row)?);
     }
+
+    info!(
+        "event=search module=search status=ok hits={} duration_ms={} query_len={} query_terms={} has_kind_filter={} raw_fts={}",
+        hits.len(),
+        started_at.elapsed().as_millis(),
+        query_len,
+        query_terms,
+        has_kind_filter,
+        query.raw_fts_syntax
+    );
 
     Ok(hits)
 }
@@ -229,5 +290,13 @@ fn is_match_syntax_error(err: &rusqlite::Error) -> bool {
                 || msg.contains("unterminated")
         }
         _ => false,
+    }
+}
+
+fn search_error_code(err: &SearchError) -> &'static str {
+    match err {
+        SearchError::InvalidQuery { .. } => "invalid_query",
+        SearchError::Db(_) => "db_error",
+        SearchError::InvalidData(_) => "invalid_data",
     }
 }

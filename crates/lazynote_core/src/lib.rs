@@ -2,11 +2,13 @@
 //! This crate is the single source of truth for business invariants.
 
 pub mod db;
+pub mod logging;
 pub mod model;
 pub mod repo;
 pub mod search;
 pub mod service;
 
+pub use logging::{default_log_level, init_logging, logging_status};
 pub use model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
 pub use repo::atom_repo::{
     AtomListQuery, AtomRepository, RepoError, RepoResult, SqliteAtomRepository,
