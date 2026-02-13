@@ -32,7 +32,7 @@ The original PR list is valid. We applied these optimizations:
 - PR0000, PR0001, PR0002
 - PR0003-A, PR0003-B, PR0004, PR0005
 - PR0006, PR0007
-- PR0008, PR0009, PR0010
+- PR0008, PR0009A, PR0009B, PR0009C, PR0009D, PR0010
 - PR0011, PR0012, PR0013
 - PR0014, PR0015, PR0016
 
@@ -52,4 +52,9 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0007` FTS5 search (`atoms_fts` + trigger sync + core search API/tests)
 - Completed: `PR-0008` UI shell (Windows) with Workbench default homepage + placeholder routes
 - Completed: `PR-0017` Workbench split-shell with pinned debug logs panel, draggable splitter, and local log tail + copy/open-folder actions
-- Next: `PR-0009` single-entry router
+- Next: `PR-0009A` entry FFI surface (split from PR-0009 epic)
+
+Execution note:
+
+- Workbench remains the default homepage and debug log viewer.
+- Single Entry is introduced as a Workbench-internal tool (button-triggered), not a homepage replacement.
