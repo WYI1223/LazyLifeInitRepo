@@ -1,7 +1,7 @@
 # PR-0004-atom-model
 
 - Proposed title: `core(model): define Atom model + IDs + soft delete`
-- Status: Draft
+- Status: Completed
 
 ## Goal
 Implement the unified Atom domain model.
@@ -21,9 +21,16 @@ Implement the unified Atom domain model.
 - PR0003
 
 ## Acceptance Criteria
-- [ ] Scope implemented
-- [ ] Basic verification/tests added
-- [ ] Documentation updated if behavior changes
+- [x] Scope implemented
+- [x] Basic verification/tests added
+- [x] Documentation updated if behavior changes
 
 ## Notes
-- TODO
+- Added `Atom`, `AtomType`, `TaskStatus`, and `AtomId` in `lazynote_core`.
+- Added soft-delete helpers (`soft_delete`, `restore`, `is_active`).
+- Added serialization baseline via `serde` and integration test coverage in `tests/atom_model.rs`.
+- Reserved `hlc_timestamp` field for later CRDT/HLC work.
+- Verification:
+  - `cd crates && cargo fmt --all -- --check`
+  - `cd crates && cargo clippy --all -- -D warnings`
+  - `cd crates && cargo test --all`

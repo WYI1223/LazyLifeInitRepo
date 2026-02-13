@@ -1,6 +1,10 @@
 //! Core domain logic for LazyNote.
 //! This crate is the single source of truth for business invariants.
 
+pub mod model;
+
+pub use model::atom::{Atom, AtomId, AtomType, TaskStatus};
+
 /// Minimal health-check API for early integration.
 pub fn ping() -> &'static str {
     "pong"
