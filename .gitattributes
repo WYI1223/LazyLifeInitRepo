@@ -1,0 +1,15 @@
+# Keep source files on LF by default
+* text=auto eol=lf
+
+# Shell / batch scripts on Windows-style line endings
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Common source/config files that should remain LF
+*.rs text eol=lf
+*.toml text eol=lf
+*.dart text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf

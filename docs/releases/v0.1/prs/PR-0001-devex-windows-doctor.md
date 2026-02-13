@@ -1,7 +1,7 @@
 # PR-0001-devex-windows-doctor
 
 - Proposed title: `chore(devex): add Windows dev docs + doctor scripts`
-- Status: Draft
+- Status: Completed
 
 ## Goal
 Make local setup reproducible for new contributors.
@@ -21,9 +21,15 @@ Make local setup reproducible for new contributors.
 - PR0000
 
 ## Acceptance Criteria
-- [ ] Scope implemented
-- [ ] Basic verification/tests added
-- [ ] Documentation updated if behavior changes
+- [x] Scope implemented
+- [x] Basic verification/tests added
+- [x] Documentation updated if behavior changes
 
 ## Notes
-- TODO
+- Implemented:
+  - `docs/development/windows.md`
+  - `scripts/doctor.ps1`
+  - `.gitattributes` line-ending policy
+  - README development entry updates
+- Typical verification:
+  - `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/doctor.ps1 -SkipFlutterDoctor`

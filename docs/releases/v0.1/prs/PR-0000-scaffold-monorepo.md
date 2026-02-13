@@ -1,7 +1,7 @@
 # PR-0000-scaffold-monorepo
 
 - Proposed title: `chore(repo): scaffold monorepo skeleton`
-- Status: Draft
+- Status: Completed
 
 ## Goal
 Build the monorepo skeleton defined in README.
@@ -28,9 +28,17 @@ Build the monorepo skeleton defined in README.
 - None
 
 ## Acceptance Criteria
-- [ ] Scope implemented
-- [ ] Basic verification/tests added
-- [ ] Documentation updated if behavior changes
+- [x] Scope implemented
+- [x] Basic verification/tests added
+- [x] Documentation updated if behavior changes
 
 ## Notes
-- TODO
+- Monorepo skeleton is in place:
+  - `apps/lazynote_flutter`
+  - `crates/{lazynote_core,lazynote_ffi,lazynote_cli}`
+  - `docs/*` structure
+  - `.github/workflows/ci.yml` baseline
+- Workspace smoke checks executed:
+  - `cd crates && cargo build`
+  - `cd crates && cargo test`
+  - `cd crates && cargo run -p lazynote_cli`

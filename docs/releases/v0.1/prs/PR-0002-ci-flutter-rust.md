@@ -1,7 +1,7 @@
 # PR-0002-ci-flutter-rust
 
 - Proposed title: `chore(ci): add CI for Flutter + Rust (Windows + Ubuntu)`
-- Status: Draft
+- Status: Completed
 
 ## Goal
 Protect PRs from build/test regressions.
@@ -21,9 +21,14 @@ Protect PRs from build/test regressions.
 - PR0000, PR0001
 
 ## Acceptance Criteria
-- [ ] Scope implemented
-- [ ] Basic verification/tests added
-- [ ] Documentation updated if behavior changes
+- [x] Scope implemented
+- [x] Basic verification/tests added
+- [x] Documentation updated if behavior changes
 
 ## Notes
-- TODO
+- CI workflow enforces:
+  - Flutter Windows: `pub get`, format check, analyze, test, debug build
+  - Rust Ubuntu: `fmt`, `clippy -D warnings`, `test`
+- Local CI helper scripts are available:
+  - `tools/ci/flutter_windows_build.ps1`
+  - `tools/ci/rust_checks.ps1`

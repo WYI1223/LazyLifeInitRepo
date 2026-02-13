@@ -2,7 +2,7 @@
 
 - Proposed title (PR-A): `chore(frb): wire minimal ffi api (ping/core_version)`
 - Proposed title (PR-B): `feat(flutter): call rust ping/core_version on windows`
-- Status: Ready (B, pending manual `flutter run -d windows`)
+- Status: Completed
 
 ## Goal
 Split FRB wiring into two small PRs, so we can isolate problems:
@@ -66,6 +66,7 @@ Out of scope:
 - [add] `apps/lazynote_flutter/lib/core/rust_bridge.dart`
 - [edit] `apps/lazynote_flutter/lib/main.dart`
 - [edit] `apps/lazynote_flutter/test/widget_test.dart`
+- [add] `apps/lazynote_flutter/test/rust_bridge_test.dart`
 - [add] `scripts/run_windows_smoke.bat`
 
 ## Dependencies
@@ -77,7 +78,7 @@ Out of scope:
 - [x] `cargo test -p lazynote_ffi` passes
 - [x] `flutter analyze` passes after dependency update
 - [x] PR-B scope implemented
-- [ ] `flutter run -d windows` shows ping/coreVersion in UI
+- [x] `flutter run -d windows` shows ping/coreVersion in UI
 - [x] `flutter test` passes with injected mock loader
 - [x] Documentation updated if behavior changes
 
@@ -108,3 +109,7 @@ flutter run -d windows
 ## Notes
 - Keep FRB versions aligned (`2.11.1`) across Rust and Flutter runtime/codegen.
 - `rust_bridge.dart` includes workspace DLL path probing for local development.
+- Post-review hardening completed:
+  - candidate DLL open failure logs path + exception and continues fallback
+  - init deduplicates concurrent calls and supports retry after failure
+  - dedicated `rust_bridge_test.dart` covers init race/retry/fallback logic

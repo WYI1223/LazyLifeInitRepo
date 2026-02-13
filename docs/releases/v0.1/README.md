@@ -39,3 +39,11 @@ The original PR list is valid. We applied these optimizations:
 ## PR Specs
 
 See `docs/releases/v0.1/prs/`.
+
+## Current Progress
+
+- Completed: `PR-0000` monorepo scaffold
+- Completed: `PR-0001` Windows DevEx + doctor
+- Completed: `PR-0002` CI (Flutter Windows + Rust Ubuntu)
+- Completed: `PR-0003` FRB wire-up (`ping/core_version`) with Windows smoke UI
+- Next: `PR-0004` Atom model
