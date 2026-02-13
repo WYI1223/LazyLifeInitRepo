@@ -47,4 +47,5 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0002` CI (Flutter Windows + Rust Ubuntu)
 - Completed: `PR-0003` FRB wire-up (`ping/core_version`) with Windows smoke UI
 - Completed: `PR-0004` Atom model (`Atom` + stable ID + soft delete + serde baseline)
-- Next: `PR-0005` SQLite schema + migrations
+- Completed: `PR-0005` SQLite schema + migrations (`open_db` + versioned migrations + DB smoke tests)
+- Next: `PR-0006` core CRUD

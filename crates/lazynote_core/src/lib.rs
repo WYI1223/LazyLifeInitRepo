@@ -1,6 +1,7 @@
 //! Core domain logic for LazyNote.
 //! This crate is the single source of truth for business invariants.
 
+pub mod db;
 pub mod model;
 
 pub use model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
