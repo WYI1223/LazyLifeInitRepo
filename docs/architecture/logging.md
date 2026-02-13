@@ -48,10 +48,10 @@
 ### `init_logging(level, log_dir)`
 
 - Must be called once during app startup, before `core_init` / `db_open` / `migrate`.
-- Repeated calls are treated as idempotent no-op.
+- Repeated calls are idempotent only when `level + log_dir` are unchanged.
 - Logging initialization must never crash the app.
 - Initialization failures are returned as strings.
-- Later calls must not silently reconfigure to a different `log_dir` in the same session.
+- Later calls must not silently reconfigure to a different `level` or `log_dir` in the same session.
 
 Recommended semantic contract:
 

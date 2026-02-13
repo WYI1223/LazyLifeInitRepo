@@ -38,12 +38,13 @@ struct LoggingState {
 ///
 /// # Invariants
 /// - Calling this function repeatedly with the same `log_dir` is idempotent.
+/// - Calling this function repeatedly with a different `level` is rejected.
 /// - Re-initialization with a different `log_dir` is rejected.
 /// - Initialization never panics.
 ///
 /// # Errors
 /// - Returns an error when `level` is unsupported.
-/// - Returns an error when `log_dir` is empty or cannot be created.
+/// - Returns an error when `log_dir` is empty, non-absolute, or cannot be created.
 /// - Returns an error when logger backend setup fails.
 pub fn init_logging(level: &str, log_dir: &str) -> Result<(), String> {
     let normalized_level = normalize_level(level)?;
@@ -51,6 +52,12 @@ pub fn init_logging(level: &str, log_dir: &str) -> Result<(), String> {
 
     if let Some(state) = LOGGING_STATE.get() {
         if state.log_dir == normalized_dir {
+            if state.level != normalized_level {
+                return Err(format!(
+                    "logging already initialized with level `{}`; refusing to switch to `{}`",
+                    state.level, normalized_level
+                ));
+            }
             return Ok(());
         }
         return Err(format!(
@@ -116,6 +123,12 @@ pub fn init_logging(level: &str, log_dir: &str) -> Result<(), String> {
             normalized_dir.display()
         ));
     }
+    if state.level != normalized_level {
+        return Err(format!(
+            "logging already initialized with level `{}`; refusing to switch to `{}`",
+            state.level, normalized_level
+        ));
+    }
 
     Ok(())
 }
@@ -160,7 +173,11 @@ fn normalize_log_dir(log_dir: &str) -> Result<PathBuf, String> {
     if trimmed.is_empty() {
         return Err("log_dir cannot be empty".to_string());
     }
-    Ok(Path::new(trimmed).to_path_buf())
+    let path = Path::new(trimmed);
+    if !path.is_absolute() {
+        return Err(format!("log_dir must be an absolute path, got `{trimmed}`"));
+    }
+    Ok(path.to_path_buf())
 }
 
 fn build_mode() -> &'static str {
@@ -208,10 +225,85 @@ fn panic_payload_summary(info: &std::panic::PanicHookInfo<'_>) -> String {
 }
 
 fn sanitize_message(value: &str, max_chars: usize) -> String {
-    let normalized = value.replace('\n', " ").replace('\r', " ");
+    let normalized = value.replace(['\n', '\r'], " ");
     let mut truncated = normalized.chars().take(max_chars).collect::<String>();
     if normalized.chars().count() > max_chars {
         truncated.push_str("...");
     }
     truncated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        init_logging, logging_status, normalize_level, normalize_log_dir, sanitize_message,
+    };
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(suffix: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be after unix epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "lazynote-logging-{suffix}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
+
+    #[test]
+    fn normalize_level_accepts_known_values() {
+        assert_eq!(
+            normalize_level("INFO").expect("INFO should normalize"),
+            "info"
+        );
+        assert_eq!(
+            normalize_level(" warning ").expect("warning should normalize"),
+            "warn"
+        );
+    }
+
+    #[test]
+    fn normalize_log_dir_rejects_relative_path() {
+        let error = normalize_log_dir("logs/dev").expect_err("relative paths must be rejected");
+        assert!(error.contains("absolute"));
+    }
+
+    #[test]
+    fn sanitize_message_removes_newlines_and_truncates() {
+        let sanitized = sanitize_message("line1\nline2\rline3", 8);
+        assert!(!sanitized.contains('\n'));
+        assert!(!sanitized.contains('\r'));
+        assert!(sanitized.ends_with("..."));
+    }
+
+    #[test]
+    fn init_logging_is_idempotent_for_same_config_and_rejects_conflicts() {
+        let log_dir = unique_temp_dir("idempotent");
+        let log_dir_str = log_dir
+            .to_str()
+            .expect("temp dir should be valid UTF-8")
+            .to_string();
+        let second_dir = unique_temp_dir("different");
+        let second_dir_str = second_dir
+            .to_str()
+            .expect("temp dir should be valid UTF-8")
+            .to_string();
+
+        init_logging("info", &log_dir_str).expect("first init should succeed");
+        init_logging("info", &log_dir_str).expect("same config should be idempotent");
+
+        let level_error =
+            init_logging("debug", &log_dir_str).expect_err("level conflict should fail");
+        assert!(level_error.contains("refusing to switch"));
+
+        let dir_error =
+            init_logging("info", &second_dir_str).expect_err("directory conflict should fail");
+        assert!(dir_error.contains("refusing to switch"));
+
+        let (active_level, active_dir) = logging_status().expect("logging should be active");
+        assert_eq!(active_level, "info");
+        assert_eq!(active_dir, log_dir);
+    }
 }
