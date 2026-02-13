@@ -1,3 +1,4 @@
+use lazynote_core::db::migrations::latest_version;
 use lazynote_core::db::open_db_in_memory;
 use lazynote_core::{
     Atom, AtomListQuery, AtomRepository, AtomService, AtomType, RepoError, SqliteAtomRepository,
@@ -169,6 +170,44 @@ fn repository_rejects_uninitialized_connection() {
         Err(other) => panic!("unexpected error: {other}"),
         Ok(_) => panic!("expected uninitialized connection error"),
     }
+}
+
+#[test]
+fn repository_rejects_connection_without_required_atoms_table() {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(&format!("PRAGMA user_version = {};", latest_version()))
+        .unwrap();
+
+    let result = SqliteAtomRepository::try_new(&conn);
+    assert!(matches!(
+        result,
+        Err(RepoError::MissingRequiredTable("atoms"))
+    ));
+}
+
+#[test]
+fn repository_rejects_connection_missing_required_atoms_column() {
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(
+        "CREATE TABLE atoms (
+            uuid TEXT PRIMARY KEY NOT NULL,
+            type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0
+        );",
+    )
+    .unwrap();
+    conn.execute_batch(&format!("PRAGMA user_version = {};", latest_version()))
+        .unwrap();
+
+    let result = SqliteAtomRepository::try_new(&conn);
+    assert!(matches!(
+        result,
+        Err(RepoError::MissingRequiredColumn {
+            table: "atoms",
+            column: "updated_at"
+        })
+    ));
 }
 
 #[test]

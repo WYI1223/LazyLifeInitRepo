@@ -104,6 +104,7 @@ Provide stable core CRUD operations.
 - Added `AtomService` as use-case wrapper over repository.
 - Enforced `Atom::validate()` on repository write paths.
 - Repository construction now uses `try_new` guard to reject uninitialized/non-migrated connections.
+- Repository constructor guard now validates required `atoms` schema columns to prevent forged `user_version` bypass.
 - Kept PR core-only (no FFI CRUD exposure yet).
 - Added integration tests in `tests/atom_crud.rs` for:
   - create/get roundtrip
@@ -113,6 +114,7 @@ Provide stable core CRUD operations.
   - validation failure on create/update
   - type filter query
   - pagination branches (`limit + offset`, offset-only)
+  - connection guard branches (`MissingRequiredTable`, `MissingRequiredColumn`)
   - service wrapper smoke flow
 - Verification:
   - `cd crates && cargo fmt --all -- --check`

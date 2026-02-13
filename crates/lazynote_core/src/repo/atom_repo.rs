@@ -31,19 +31,31 @@ const ATOM_SELECT_SQL: &str = "SELECT
     is_deleted
 FROM atoms";
 
+/// Result type used by atom repository operations.
 pub type RepoResult<T> = Result<T, RepoError>;
 
 /// Generic repository error for atom persistence and query operations.
 #[derive(Debug)]
 pub enum RepoError {
+    /// Domain-level atom validation failed before SQL execution.
     Validation(AtomValidationError),
+    /// Underlying database/bootstrap operation failed.
     Db(DbError),
+    /// Requested atom does not exist.
     NotFound(AtomId),
+    /// Connection is open but not initialized to expected migration version.
     UninitializedConnection {
         expected_version: u32,
         actual_version: u32,
     },
+    /// Required table is missing from schema.
     MissingRequiredTable(&'static str),
+    /// Required column is missing from a required table.
+    MissingRequiredColumn {
+        table: &'static str,
+        column: &'static str,
+    },
+    /// Persisted row exists but cannot be converted into a valid atom.
     InvalidData(String),
 }
 
@@ -63,6 +75,10 @@ impl Display for RepoError {
             Self::MissingRequiredTable(table) => {
                 write!(f, "repository requires table `{table}`, but it was not found")
             }
+            Self::MissingRequiredColumn { table, column } => write!(
+                f,
+                "repository requires column `{column}` in table `{table}`, but it was not found"
+            ),
             Self::InvalidData(message) => write!(f, "invalid persisted atom data: {message}"),
         }
     }
@@ -76,6 +92,7 @@ impl Error for RepoError {
             Self::NotFound(_) => None,
             Self::UninitializedConnection { .. } => None,
             Self::MissingRequiredTable(_) => None,
+            Self::MissingRequiredColumn { .. } => None,
             Self::InvalidData(_) => None,
         }
     }
@@ -102,18 +119,34 @@ impl From<rusqlite::Error> for RepoError {
 /// Query options for listing atoms.
 #[derive(Debug, Clone, Default)]
 pub struct AtomListQuery {
+    /// Optional filter by atom kind.
     pub kind: Option<AtomType>,
+    /// Whether soft-deleted rows should be included.
     pub include_deleted: bool,
+    /// Maximum rows to return. When `None`, no explicit limit is applied.
     pub limit: Option<u32>,
+    /// Number of rows to skip from the sorted result set.
     pub offset: u32,
 }
 
 /// Repository interface for atom CRUD operations.
 pub trait AtomRepository {
+    /// Inserts a new atom and returns its stable ID.
     fn create_atom(&self, atom: &Atom) -> RepoResult<AtomId>;
+    /// Updates an existing atom by ID.
+    ///
+    /// Returns [`RepoError::NotFound`] when the target ID does not exist.
     fn update_atom(&self, atom: &Atom) -> RepoResult<()>;
+    /// Loads a single atom by ID.
+    ///
+    /// Returns `None` when no row exists or row is soft-deleted and
+    /// `include_deleted` is `false`.
     fn get_atom(&self, id: AtomId, include_deleted: bool) -> RepoResult<Option<Atom>>;
+    /// Lists atoms using filter/pagination options.
     fn list_atoms(&self, query: &AtomListQuery) -> RepoResult<Vec<Atom>>;
+    /// Soft-deletes an atom by ID.
+    ///
+    /// This operation is idempotent for rows already marked deleted.
     fn soft_delete_atom(&self, id: AtomId) -> RepoResult<()>;
 }
 
@@ -123,6 +156,14 @@ pub struct SqliteAtomRepository<'conn> {
 }
 
 impl<'conn> SqliteAtomRepository<'conn> {
+    /// Constructs a repository from an existing SQLite connection.
+    ///
+    /// # Errors
+    /// - Returns [`RepoError::UninitializedConnection`] if schema version is not
+    ///   fully migrated.
+    /// - Returns [`RepoError::MissingRequiredTable`] or
+    ///   [`RepoError::MissingRequiredColumn`] when required schema shape is
+    ///   incomplete.
     pub fn try_new(conn: &'conn Connection) -> RepoResult<Self> {
         ensure_connection_ready(conn)?;
         Ok(Self { conn })
@@ -357,6 +398,7 @@ fn bool_to_int(value: bool) -> i64 {
     }
 }
 
+/// Validates that the connection schema is ready for repository queries.
 fn ensure_connection_ready(conn: &Connection) -> RepoResult<()> {
     let expected_version = latest_version();
     let actual_version: u32 = conn.query_row("PRAGMA user_version;", [], |row| row.get(0))?;
@@ -381,9 +423,19 @@ fn ensure_connection_ready(conn: &Connection) -> RepoResult<()> {
         return Err(RepoError::MissingRequiredTable("atoms"));
     }
 
+    for column in ["uuid", "type", "content", "is_deleted", "updated_at"] {
+        if !table_has_column(conn, "atoms", column)? {
+            return Err(RepoError::MissingRequiredColumn {
+                table: "atoms",
+                column,
+            });
+        }
+    }
+
     Ok(())
 }
 
+/// Returns whether an atom row exists regardless of soft-delete state.
 fn atom_exists(conn: &Connection, id: AtomId) -> RepoResult<bool> {
     let exists: i64 = conn.query_row(
         "SELECT EXISTS(
@@ -395,4 +447,19 @@ fn atom_exists(conn: &Connection, id: AtomId) -> RepoResult<bool> {
         |row| row.get(0),
     )?;
     Ok(exists == 1)
+}
+
+/// Checks whether a table contains the specified column name.
+fn table_has_column(conn: &Connection, table: &str, column: &str) -> RepoResult<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table});"))?;
+    let mut rows = stmt.query([])?;
+
+    while let Some(row) = rows.next()? {
+        let current: String = row.get(1)?;
+        if current == column {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
