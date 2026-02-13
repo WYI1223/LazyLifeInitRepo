@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lazynote_flutter/features/entry/entry_state.dart';
 import 'package:lazynote_flutter/features/entry/single_entry_controller.dart';
+import 'package:lazynote_flutter/features/search/search_results_view.dart';
 
 /// Single Entry input panel rendered inside Workbench left pane.
 class SingleEntryPanel extends StatelessWidget {
@@ -106,6 +107,14 @@ class SingleEntryPanel extends StatelessWidget {
                   controller.state.statusMessage?.type,
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            SearchResultsView(
+              visible: controller.isSearchIntentActive,
+              isLoading: controller.isSearchLoading,
+              errorMessage: controller.searchErrorMessage,
+              items: controller.searchItems,
+              appliedLimit: controller.searchAppliedLimit,
             ),
             if (controller.visibleDetail case final detail?) ...[
               const SizedBox(height: 12),

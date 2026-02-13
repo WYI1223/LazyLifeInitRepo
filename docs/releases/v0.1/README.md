@@ -52,7 +52,10 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0007` FTS5 search (`atoms_fts` + trigger sync + core search API/tests)
 - Completed: `PR-0008` UI shell (Windows) with Workbench default homepage + placeholder routes
 - Completed: `PR-0017` Workbench split-shell with pinned debug logs panel, draggable splitter, and local log tail + copy/open-folder actions
-- Next: `PR-0009A` entry FFI surface (split from PR-0009 epic)
+- Completed: `PR-0009A` entry FFI surface (async APIs + structured status envelopes)
+- Completed: `PR-0009B` entry parser/state + Workbench-integrated Single Entry panel
+- In Progress: `PR-0009C` realtime search flow (`onChanged` search + result list rendering + stale-response guard)
+- Next: `PR-0009D` command execution flow (`new note/task/schedule`)
 
 Execution note:
 

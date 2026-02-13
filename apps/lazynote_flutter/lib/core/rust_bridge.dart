@@ -56,6 +56,10 @@ typedef RustBridgeLogger =
 typedef RustInitLoggingCall =
     String Function({required String level, required String logDir});
 
+/// Pluggable FFI call used to configure entry DB path.
+typedef RustConfigureEntryDbPathCall =
+    String Function({required String dbPath});
+
 /// Rust FFI bootstrap helper for app startup and diagnostics flows.
 ///
 /// Contract:
@@ -102,6 +106,11 @@ class RustBridge {
           rust_api.initLogging(level: level, logDir: logDir);
 
   @visibleForTesting
+  static RustConfigureEntryDbPathCall configureEntryDbPathCall =
+      ({required String dbPath}) =>
+          rust_api.configureEntryDbPath(dbPath: dbPath);
+
+  @visibleForTesting
   static RustBridgeLogger logger =
       ({required String message, Object? error, StackTrace? stackTrace}) {
         dev.log(
@@ -135,6 +144,8 @@ class RustBridge {
     defaultLogLevelResolver = () => kReleaseMode ? 'info' : 'debug';
     initLoggingCall = ({required String level, required String logDir}) =>
         rust_api.initLogging(level: level, logDir: logDir);
+    configureEntryDbPathCall = ({required String dbPath}) =>
+        rust_api.configureEntryDbPath(dbPath: dbPath);
     logger =
         ({required String message, Object? error, StackTrace? stackTrace}) {
           dev.log(
@@ -247,6 +258,7 @@ class RustBridge {
   static Future<RustLoggingInitSnapshot> _bootstrapLoggingInternal() async {
     final level = defaultLogLevelResolver();
     var resolvedLogDir = 'unresolved';
+    var resolvedDbPath = 'unresolved';
 
     RustLoggingInitSnapshot result;
     try {
@@ -256,8 +268,17 @@ class RustBridge {
       resolvedLogDir = Directory(
         '${supportDir.path}${Platform.pathSeparator}logs',
       ).path;
+      resolvedDbPath =
+          '${supportDir.path}${Platform.pathSeparator}data${Platform.pathSeparator}lazynote_entry.sqlite3';
 
       await init();
+      final dbConfigError = configureEntryDbPathCall(dbPath: resolvedDbPath);
+      if (dbConfigError.isNotEmpty) {
+        logger(
+          message: 'Rust entry DB path configure returned error.',
+          error: dbConfigError,
+        );
+      }
       final initError = initLoggingCall(level: level, logDir: resolvedLogDir);
       if (initError.isEmpty) {
         result = RustLoggingInitSnapshot.success(

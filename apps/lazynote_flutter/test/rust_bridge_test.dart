@@ -93,6 +93,7 @@ void main() {
 
     var initLoggingCalls = 0;
     RustBridge.rustLibInit = (_) async {};
+    RustBridge.configureEntryDbPathCall = ({required dbPath}) => '';
     RustBridge.initLoggingCall = ({required level, required logDir}) {
       initLoggingCalls += 1;
       return '';
@@ -114,6 +115,7 @@ void main() {
     RustBridge.resetForTesting();
     RustBridge.applicationSupportDirectoryResolver = () async =>
         Directory.systemTemp;
+    RustBridge.configureEntryDbPathCall = ({required dbPath}) => '';
     RustBridge.rustLibInit = (_) async {
       throw StateError('ffi init failed');
     };

@@ -59,13 +59,13 @@ void main() {
 
     await tester.enterText(
       find.byKey(const Key('single_entry_input')),
-      'search notes',
+      '> task search notes',
     );
     await tester.pump();
     expect(sendIcon().color, Colors.blue);
   });
 
-  testWidgets('onChanged previews route while Enter opens detail', (
+  testWidgets('onChanged command preview and Enter detail are split', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const LazyNoteApp());
@@ -75,12 +75,12 @@ void main() {
 
     await tester.enterText(
       find.byKey(const Key('single_entry_input')),
-      'project update',
+      '> task project update',
     );
     await tester.pump();
 
     expect(
-      find.text('Search preview ready. Press Enter or Send for details.'),
+      find.text('Command preview ready. Press Enter or Send for details.'),
       findsOneWidget,
     );
     expect(find.byKey(const Key('single_entry_detail')), findsNothing);

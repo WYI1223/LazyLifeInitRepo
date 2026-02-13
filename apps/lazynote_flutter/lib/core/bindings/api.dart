@@ -6,7 +6,7 @@
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:lazynote_flutter/core/bindings/frb_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `atom_type_label`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `normalize_entry_limit`, `resolve_entry_db_path`, `success`, `to_entry_search_item`, `with_atom_service`
+// These functions are ignored because they are not marked as `pub`: `atom_type_label`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `normalize_entry_limit`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `to_entry_search_item`, `with_atom_service`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
 
 /// Minimal health-check API for FRB smoke integration.
@@ -38,6 +38,15 @@ String coreVersion() => RustLib.instance.api.crateApiCoreVersion();
 /// - Never panics; returns empty string on success and error message on failure.
 String initLogging({required String level, required String logDir}) =>
     RustLib.instance.api.crateApiInitLogging(level: level, logDir: logDir);
+
+/// Configures a process-local default SQLite path for entry APIs.
+///
+/// # FFI contract
+/// - Sync call, non-blocking.
+/// - Safe to call multiple times; latest successful path wins.
+/// - Returns empty string on success, error message on validation/IO failure.
+String configureEntryDbPath({required String dbPath}) =>
+    RustLib.instance.api.crateApiConfigureEntryDbPath(dbPath: dbPath);
 
 /// Searches single-entry text using entry-level defaults.
 ///

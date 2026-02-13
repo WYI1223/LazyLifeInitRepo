@@ -17,10 +17,12 @@ use lazynote_core::{
     search_all, AtomService, AtomType, ScheduleEventRequest, SearchQuery, SqliteAtomRepository,
 };
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 const ENTRY_DEFAULT_LIMIT: u32 = 10;
 const ENTRY_LIMIT_MAX: u32 = 10;
 const ENTRY_DB_FILE_NAME: &str = "lazynote_entry.sqlite3";
+static ENTRY_DB_PATH_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
 /// Minimal health-check API for FRB smoke integration.
 ///
@@ -58,6 +60,20 @@ pub fn core_version() -> String {
 #[flutter_rust_bridge::frb(sync)]
 pub fn init_logging(level: String, log_dir: String) -> String {
     match init_logging_inner(level.as_str(), log_dir.as_str()) {
+        Ok(()) => String::new(),
+        Err(err) => err,
+    }
+}
+
+/// Configures a process-local default SQLite path for entry APIs.
+///
+/// # FFI contract
+/// - Sync call, non-blocking.
+/// - Safe to call multiple times; latest successful path wins.
+/// - Returns empty string on success, error message on validation/IO failure.
+#[flutter_rust_bridge::frb(sync)]
+pub fn configure_entry_db_path(db_path: String) -> String {
+    match set_configured_entry_db_path(db_path.as_str()) {
         Ok(()) => String::new(),
         Err(err) => err,
     }
@@ -266,7 +282,39 @@ fn resolve_entry_db_path() -> PathBuf {
             return PathBuf::from(trimmed);
         }
     }
+
+    if let Ok(guard) = ENTRY_DB_PATH_OVERRIDE.lock() {
+        if let Some(path) = guard.as_ref() {
+            return path.clone();
+        }
+    }
+
     std::env::temp_dir().join(ENTRY_DB_FILE_NAME)
+}
+
+fn set_configured_entry_db_path(db_path: &str) -> Result<(), String> {
+    let trimmed = db_path.trim();
+    if trimmed.is_empty() {
+        return Err("db_path must not be empty".to_string());
+    }
+
+    let path = PathBuf::from(trimmed);
+    if !path.is_absolute() {
+        return Err("db_path must be an absolute path".to_string());
+    }
+
+    if let Some(parent) = path.parent() {
+        if !parent.as_os_str().is_empty() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| format!("failed to create db parent directory: {err}"))?;
+        }
+    }
+
+    let mut guard = ENTRY_DB_PATH_OVERRIDE
+        .lock()
+        .map_err(|_| "entry db path lock poisoned".to_string())?;
+    *guard = Some(path);
+    Ok(())
 }
 
 fn with_atom_service(
@@ -301,8 +349,8 @@ fn atom_type_label(kind: AtomType) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        core_version, entry_create_note_impl, entry_create_task_impl, entry_schedule_impl,
-        entry_search_impl, init_logging, ping,
+        configure_entry_db_path, core_version, entry_create_note_impl, entry_create_task_impl,
+        entry_schedule_impl, entry_search_impl, init_logging, ping,
     };
     use lazynote_core::db::open_db;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -326,6 +374,18 @@ mod tests {
     #[test]
     fn init_logging_rejects_unsupported_level() {
         let error = init_logging("verbose".to_string(), "tmp/logs".to_string());
+        assert!(!error.is_empty());
+    }
+
+    #[test]
+    fn configure_entry_db_path_rejects_empty_path() {
+        let error = configure_entry_db_path(String::new());
+        assert!(!error.is_empty());
+    }
+
+    #[test]
+    fn configure_entry_db_path_rejects_relative_path() {
+        let error = configure_entry_db_path("relative/path.sqlite3".to_string());
         assert!(!error.is_empty());
     }
 
