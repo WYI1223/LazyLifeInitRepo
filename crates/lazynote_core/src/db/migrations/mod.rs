@@ -33,6 +33,10 @@ const MIGRATIONS: &[Migration] = &[
         version: 3,
         sql: include_str!("0003_external_mappings.sql"),
     },
+    Migration {
+        version: 4,
+        sql: include_str!("0004_fts.sql"),
+    },
 ];
 
 /// Returns the latest migration version known by this binary.

@@ -4,12 +4,14 @@
 pub mod db;
 pub mod model;
 pub mod repo;
+pub mod search;
 pub mod service;
 
 pub use model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
 pub use repo::atom_repo::{
     AtomListQuery, AtomRepository, RepoError, RepoResult, SqliteAtomRepository,
 };
+pub use search::fts::{search_all, SearchError, SearchHit, SearchQuery, SearchResult};
 pub use service::atom_service::AtomService;
 
 /// Minimal health-check API for early integration.
