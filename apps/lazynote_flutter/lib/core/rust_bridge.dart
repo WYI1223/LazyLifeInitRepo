@@ -69,6 +69,10 @@ typedef RustConfigureEntryDbPathCall =
 class RustBridge {
   static bool _initialized = false;
   static Future<void>? _initFuture;
+  // Tracks entry DB path readiness independently from logging bootstrap.
+  // Search/command paths can require this before logs are initialized.
+  static bool _entryDbPathConfigured = false;
+  static Future<void>? _entryDbPathFuture;
   static RustLoggingInitSnapshot? _latestLoggingInitSnapshot;
   static Future<RustLoggingInitSnapshot>? _loggingInitFuture;
 
@@ -129,6 +133,8 @@ class RustBridge {
   static void resetForTesting() {
     _initialized = false;
     _initFuture = null;
+    _entryDbPathConfigured = false;
+    _entryDbPathFuture = null;
     _latestLoggingInitSnapshot = null;
     _loggingInitFuture = null;
     operatingSystem = () => Platform.operatingSystem;
@@ -233,6 +239,61 @@ class RustBridge {
   static RustLoggingInitSnapshot? get latestLoggingInitSnapshot =>
       _latestLoggingInitSnapshot;
 
+  /// Ensures entry DB path is configured before entry search/command calls.
+  ///
+  /// Contract:
+  /// - De-duplicates concurrent calls in-process.
+  /// - Safe to call repeatedly; subsequent calls are no-op after success.
+  /// - Throws on configuration failure so callers can surface deterministic
+  ///   startup/command errors instead of silently falling back to temp DB.
+  static Future<void> ensureEntryDbPathConfigured({String? dbPathOverride}) {
+    if (_entryDbPathConfigured) {
+      return Future.value();
+    }
+
+    final inFlight = _entryDbPathFuture;
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _ensureEntryDbPathConfiguredInternal(
+      dbPathOverride: dbPathOverride,
+    );
+    _entryDbPathFuture = future;
+    return future;
+  }
+
+  static String _resolveEntryDbPathFromSupportDir(Directory supportDir) {
+    return '${supportDir.path}${Platform.pathSeparator}data${Platform.pathSeparator}lazynote_entry.sqlite3';
+  }
+
+  static Future<void> _ensureEntryDbPathConfiguredInternal({
+    String? dbPathOverride,
+  }) async {
+    try {
+      final resolvedDbPath =
+          dbPathOverride ??
+          _resolveEntryDbPathFromSupportDir(
+            await applicationSupportDirectoryResolver(),
+          );
+
+      await init();
+      final dbConfigError = configureEntryDbPathCall(dbPath: resolvedDbPath);
+      if (dbConfigError.isNotEmpty) {
+        throw StateError(
+          'entry db path configure failed for "$resolvedDbPath": $dbConfigError',
+        );
+      }
+
+      _entryDbPathConfigured = true;
+      // Clear in-flight marker so subsequent calls fast-path on configured flag.
+      _entryDbPathFuture = null;
+    } catch (_) {
+      _entryDbPathFuture = null;
+      rethrow;
+    }
+  }
+
   /// Initializes Rust logging for the current process.
   ///
   /// Non-fatal behavior:
@@ -268,17 +329,9 @@ class RustBridge {
       resolvedLogDir = Directory(
         '${supportDir.path}${Platform.pathSeparator}logs',
       ).path;
-      resolvedDbPath =
-          '${supportDir.path}${Platform.pathSeparator}data${Platform.pathSeparator}lazynote_entry.sqlite3';
+      resolvedDbPath = _resolveEntryDbPathFromSupportDir(supportDir);
 
-      await init();
-      final dbConfigError = configureEntryDbPathCall(dbPath: resolvedDbPath);
-      if (dbConfigError.isNotEmpty) {
-        logger(
-          message: 'Rust entry DB path configure returned error.',
-          error: dbConfigError,
-        );
-      }
+      await ensureEntryDbPathConfigured(dbPathOverride: resolvedDbPath);
       final initError = initLoggingCall(level: level, logDir: resolvedLogDir);
       if (initError.isEmpty) {
         result = RustLoggingInitSnapshot.success(
@@ -295,7 +348,8 @@ class RustBridge {
       }
     } catch (error, stackTrace) {
       logger(
-        message: 'Rust logging init failed.',
+        message:
+            'Rust logging/entry-db init failed. log_dir=$resolvedLogDir db_path=$resolvedDbPath',
         error: error,
         stackTrace: stackTrace,
       );

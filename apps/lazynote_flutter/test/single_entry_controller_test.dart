@@ -166,4 +166,73 @@ void main() {
     );
     expect(controller.state.intent, isA<CommandIntent>());
   });
+
+  test('search waits for prepare step before invoking search call', () async {
+    final prepareGate = Completer<void>();
+    var prepareCalls = 0;
+    var prepareFinished = false;
+    var searchCalledBeforePrepare = false;
+
+    final controller = SingleEntryController(
+      prepareSearch: () async {
+        prepareCalls += 1;
+        await prepareGate.future;
+        prepareFinished = true;
+      },
+      searchInvoker: ({required text, required limit}) async {
+        if (!prepareFinished) {
+          searchCalledBeforePrepare = true;
+        }
+        return const EntrySearchResponse(
+          ok: true,
+          errorCode: null,
+          items: [],
+          message: 'No results.',
+          appliedLimit: 10,
+        );
+      },
+      searchDebounce: Duration.zero,
+    );
+    addTearDown(controller.dispose);
+
+    controller.handleInputChanged('race');
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.state.phase, EntryPhase.loading);
+    expect(prepareCalls, 1);
+
+    prepareGate.complete();
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(searchCalledBeforePrepare, isFalse);
+    expect(controller.state.phase, EntryPhase.success);
+  });
+
+  test('prepare failure blocks search call and surfaces error', () async {
+    var searchCalls = 0;
+
+    final controller = SingleEntryController(
+      prepareSearch: () async => throw StateError('db config failed'),
+      searchInvoker: ({required text, required limit}) async {
+        searchCalls += 1;
+        return const EntrySearchResponse(
+          ok: true,
+          errorCode: null,
+          items: [],
+          message: 'No results.',
+          appliedLimit: 10,
+        );
+      },
+      searchDebounce: Duration.zero,
+    );
+    addTearDown(controller.dispose);
+
+    controller.handleInputChanged('needs-db');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(searchCalls, 0);
+    expect(controller.state.phase, EntryPhase.error);
+    expect(controller.state.statusMessage?.text, contains('db config failed'));
+  });
 }

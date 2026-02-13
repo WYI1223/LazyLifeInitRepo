@@ -92,8 +92,12 @@ void main() {
     };
 
     var initLoggingCalls = 0;
+    var configureCalls = 0;
     RustBridge.rustLibInit = (_) async {};
-    RustBridge.configureEntryDbPathCall = ({required dbPath}) => '';
+    RustBridge.configureEntryDbPathCall = ({required dbPath}) {
+      configureCalls += 1;
+      return '';
+    };
     RustBridge.initLoggingCall = ({required level, required logDir}) {
       initLoggingCalls += 1;
       return '';
@@ -107,8 +111,38 @@ void main() {
 
     final snapshots = await Future.wait(futures);
     expect(dirCalls, 1);
+    expect(configureCalls, 1);
     expect(initLoggingCalls, 1);
     expect(snapshots.every((snapshot) => snapshot.isSuccess), isTrue);
+  });
+
+  test('ensureEntryDbPathConfigured de-duplicates concurrent calls', () async {
+    RustBridge.resetForTesting();
+    RustBridge.candidateLibraryPathsOverride = const [];
+
+    var dirCalls = 0;
+    var configureCalls = 0;
+    RustBridge.applicationSupportDirectoryResolver = () async {
+      dirCalls += 1;
+      return Directory.systemTemp;
+    };
+    RustBridge.rustLibInit = (_) async {};
+    RustBridge.configureEntryDbPathCall = ({required dbPath}) {
+      configureCalls += 1;
+      return '';
+    };
+
+    await Future.wait([
+      RustBridge.ensureEntryDbPathConfigured(),
+      RustBridge.ensureEntryDbPathConfigured(),
+      RustBridge.ensureEntryDbPathConfigured(),
+    ]);
+
+    expect(dirCalls, 1);
+    expect(configureCalls, 1);
+
+    await RustBridge.ensureEntryDbPathConfigured();
+    expect(configureCalls, 1);
   });
 
   test('bootstrapLogging returns failure snapshot on init error', () async {
@@ -124,4 +158,26 @@ void main() {
     expect(snapshot.isSuccess, isFalse);
     expect(snapshot.errorMessage, contains('ffi init failed'));
   });
+
+  test(
+    'bootstrapLogging returns failure when entry db path config fails',
+    () async {
+      RustBridge.resetForTesting();
+      RustBridge.applicationSupportDirectoryResolver = () async =>
+          Directory.systemTemp;
+      RustBridge.rustLibInit = (_) async {};
+      RustBridge.configureEntryDbPathCall = ({required dbPath}) =>
+          'db path denied';
+      var initLoggingCalls = 0;
+      RustBridge.initLoggingCall = ({required level, required logDir}) {
+        initLoggingCalls += 1;
+        return '';
+      };
+
+      final snapshot = await RustBridge.bootstrapLogging();
+      expect(snapshot.isSuccess, isFalse);
+      expect(snapshot.errorMessage, contains('db path denied'));
+      expect(initLoggingCalls, 0);
+    },
+  );
 }

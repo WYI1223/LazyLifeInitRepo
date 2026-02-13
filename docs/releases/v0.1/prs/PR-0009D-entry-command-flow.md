@@ -1,7 +1,7 @@
 # PR-0009D-entry-command-flow
 
 - Proposed title: `feat(ui): execute single-entry commands`
-- Status: Draft
+- Status: In Progress
 
 ## Goal
 
@@ -23,6 +23,46 @@ Out of scope:
 - Natural-language command expansion.
 - Non-English command aliases.
 
+## Business Logic Contract (v0.1)
+
+### Input Change Path (`onChanged`)
+
+1. Every input change still goes through parser/router.
+2. Search text (no `>`) keeps realtime search behavior from `PR-0009C`.
+3. Command text (`> ...`) only shows preview metadata and validation status.
+4. `onChanged` must not create/update atoms for command input.
+
+### Commit Path (`Enter` / send button)
+
+1. Search intent:
+   - opens current search detail payload
+   - does not create data side effects
+2. Command intent:
+   - executes exactly one mapped command action
+   - returns stable success/error status and detail payload
+   - keeps input unchanged even on execution errors
+
+### Command Mapping
+
+1. `> new note <content>` -> `entry_create_note(content)`
+2. `> task <content>` -> `entry_create_task(content)`
+3. `> schedule <date_spec> <title>` -> `entry_schedule(...)`
+   - point: `end_epoch_ms = null`
+   - range: `end_epoch_ms = Some(value)`
+
+### Feedback and Error Contract
+
+1. Success:
+   - status line shows action result (`Note created.` / `Task created.` / `Event scheduled.`)
+   - detail payload includes `action`, `atom_id`, and normalized input summary
+2. Failure:
+   - status line uses error style color
+   - detail payload includes stable failure context (`action`, message, input snapshot)
+   - input text remains unchanged
+3. Parse failure and execution failure are distinct:
+   - parse failure: router/grammar error before execution
+   - execution failure: FFI/core error after valid parse
+
 ## Command Contract (v0.1)
 
 1. `> new note <content>` creates `AtomType::Note`.
@@ -39,22 +79,40 @@ Visual feedback baseline:
 
 ## Planned File Changes
 
+- [edit] `apps/lazynote_flutter/lib/features/entry/single_entry_controller.dart`
 - [edit] `apps/lazynote_flutter/lib/features/entry/entry_shell_page.dart`
 - [edit] `apps/lazynote_flutter/lib/features/entry/command_router.dart`
 - [edit] `apps/lazynote_flutter/lib/features/entry/entry_state.dart`
-- [edit] bridge/FFI adapter files used by Flutter
-- [add] widget/unit tests for command success/failure
+- [edit] bridge/FFI adapter usage sites in Flutter
+- [add] controller/widget tests for command success/failure and input preservation
 
 ## Step-by-Step
 
-1. Ensure command input path is reachable via Workbench Single Entry button.
-2. Dispatch parsed command intents to matching FFI actions.
-3. Show success message with stable result summary (e.g., created type and id).
-4. Show error messages inline with visual error style.
-5. Preserve original input on both parser and execution errors.
-6. Add tests for each command path and failure path.
-7. Validate command flow does not break search flow.
-8. Validate command error styling and non-clearing input behavior.
+### D1: Controller execution wiring
+
+1. Keep command `onChanged` path as preview-only.
+2. Add command execution path in `handleDetailAction` for `CommandIntent`.
+3. Map each `EntryCommand` subtype to matching async FFI call.
+4. Build deterministic detail payload including `action`, `atom_id`, and request summary.
+5. Keep input unchanged on execution failure.
+
+### D2: UI feedback and tests
+
+1. Ensure status text and color reflect execution success/error.
+2. Keep send icon behavior unchanged (depends on input emptiness only).
+3. Add controller tests:
+   - `new note` success
+   - `task` success (default status expectation in returned message)
+   - `schedule` point/range success
+   - execution failure mapping (status + detail + input retained)
+4. Add widget test coverage for command execute via Enter/send.
+5. Run non-regression tests to confirm search flow still works.
+
+### D3: Docs and maintenance sync
+
+1. Update this PR file status/checklist.
+2. Sync epic tracker `PR-0009-single-entry-router.md`.
+3. Sync `docs/releases/v0.1/README.md` progress line when D is completed.
 
 ## Verification
 
@@ -68,3 +126,8 @@ Visual feedback baseline:
 - [ ] Three baseline commands execute successfully.
 - [ ] Error states are visible and non-destructive to input.
 - [ ] Schedule point/range behavior matches locked requirements.
+
+## Maintenance Record
+
+- 2026-02-13: Expanded business logic contract for command execution boundaries (`onChanged` preview vs `Enter/send` commit path).
+- 2026-02-13: Added D1/D2/D3 execution checklist to make implementation and review traceable.

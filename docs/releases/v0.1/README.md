@@ -54,7 +54,7 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0017` Workbench split-shell with pinned debug logs panel, draggable splitter, and local log tail + copy/open-folder actions
 - Completed: `PR-0009A` entry FFI surface (async APIs + structured status envelopes)
 - Completed: `PR-0009B` entry parser/state + Workbench-integrated Single Entry panel
-- Completed: `PR-0009C` realtime search flow (`onChanged` search + result list rendering + stale-response guard)
+- Completed: `PR-0009C` realtime search flow (`onChanged` search + result list rendering + stale-response guard + startup DB-path readiness hardening)
 - Next: `PR-0009D` command execution flow (`new note/task/schedule`)
 
 Execution note:

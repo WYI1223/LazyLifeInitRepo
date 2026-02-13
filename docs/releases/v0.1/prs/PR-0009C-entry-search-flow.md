@@ -138,6 +138,11 @@ Infrastructure follow-up completed:
 
 - Added FFI `configure_entry_db_path` and wired Flutter bootstrap to set entry DB path under app-support `data/lazynote_entry.sqlite3`.
 - This removes reliance on temp-file defaults for regular app runs and reduces cross-test data contamination.
+- Added `RustBridge.ensureEntryDbPathConfigured()` with in-flight de-duplication and made default search path await it before FFI search calls.
+- Updated bootstrap behavior: entry DB path configuration failure now marks bootstrap as failure snapshot (no silent success fallback).
+- Added race/ordering coverage:
+  - prepare step runs before search invocation
+  - prepare failure blocks search call and surfaces deterministic error state
 
 C3 completed:
 

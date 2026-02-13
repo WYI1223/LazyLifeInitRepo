@@ -89,3 +89,14 @@ Layout constraint:
 ## Notes
 - This is now an epic tracker.
 - Implementation and verification details live in PR-0009A/B/C/D.
+
+## Maintenance Archive
+
+- 2026-02-13: Synced review follow-up from `PR-0009A` and `PR-0009C`:
+  - entry FFI responses are machine-branchable (`ok` + `error_code`)
+  - entry APIs are async to avoid sync-FFI UI blocking risks
+  - startup path hardening added for entry DB path readiness before default search
+  - bootstrap now reports failure snapshot when DB path configure fails
+- 2026-02-13: `PR-0009D` business logic contract expanded:
+  - `onChanged` remains preview/realtime route only
+  - `Enter/send` is the commit/execute boundary for command intents

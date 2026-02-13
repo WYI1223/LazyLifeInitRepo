@@ -13,6 +13,9 @@ typedef EntrySearchInvoker =
       required int limit,
     });
 
+/// Pre-search hook used to guarantee prerequisites (for example DB path setup).
+typedef EntrySearchPrepare = Future<void> Function();
+
 /// Stateful controller for the Single Entry panel.
 ///
 /// Responsibilities:
@@ -23,13 +26,21 @@ class SingleEntryController extends ChangeNotifier {
   SingleEntryController({
     CommandRouter? router,
     EntrySearchInvoker? searchInvoker,
+    EntrySearchPrepare? prepareSearch,
     Duration searchDebounce = const Duration(milliseconds: 150),
   }) : _router = router ?? const CommandRouter(),
        _searchInvoker = searchInvoker ?? _defaultEntrySearch,
+       _prepareSearch =
+           // Why: when tests inject a custom search invoker we should not
+           // implicitly touch real bridge/bootstrap side effects unless
+           // a test explicitly asks for that behavior.
+           prepareSearch ??
+           (searchInvoker != null ? _noopPrepareSearch : _defaultPrepareSearch),
        _searchDebounce = searchDebounce;
 
   final CommandRouter _router;
   final EntrySearchInvoker _searchInvoker;
+  final EntrySearchPrepare _prepareSearch;
   final Duration _searchDebounce;
   final TextEditingController textController = TextEditingController();
   final FocusNode inputFocusNode = FocusNode();
@@ -187,6 +198,13 @@ class SingleEntryController extends ChangeNotifier {
     required SearchIntent intent,
   }) async {
     try {
+      await _prepareSearch();
+      // Why: if input changed while prerequisites were running, this request
+      // is stale and must not overwrite newer state.
+      if (requestId != _searchRequestSequence) {
+        return;
+      }
+
       final response = await _searchInvoker(
         text: intent.text,
         limit: intent.limit,
@@ -305,3 +323,9 @@ Future<rust_api.EntrySearchResponse> _defaultEntrySearch({
   await RustBridge.init();
   return rust_api.entrySearch(text: text, limit: limit);
 }
+
+Future<void> _defaultPrepareSearch() async {
+  await RustBridge.ensureEntryDbPathConfigured();
+}
+
+Future<void> _noopPrepareSearch() async {}
