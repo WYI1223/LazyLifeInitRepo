@@ -1,7 +1,7 @@
 # PR-0009B-entry-parser-state
 
 - Proposed title: `feat(ui): add single-entry parser and state model`
-- Status: In Progress (B1 Completed)
+- Status: Completed
 
 ## Goal
 
@@ -90,6 +90,31 @@ B1 verification:
    - input preservation on parse error
    - no regression to right-side debug logs panel
 
+B2 implementation-ready checklist:
+
+1. Add `single_entry_panel.dart` to encapsulate input surface UI and callbacks.
+2. Add `single_entry_controller.dart` to own:
+   - `TextEditingController`
+   - `EntryState`
+   - parser/router invocation on every `onChanged`
+   - detail action behavior for Enter/send
+3. Update `entry_shell_page.dart`:
+   - add "Single Entry" launcher in Workbench home
+   - render panel in left pane without affecting right logs panel
+   - keep existing placeholder routes working
+4. Wire B1 logic:
+   - `CommandRouter.route` on text change
+   - map `ParseErrorIntent` to `EntryState.toError`
+   - map `SearchIntent`/`CommandIntent` to non-blocking preview state
+5. Add widget keys for stable tests:
+   - `single_entry_input`
+   - `single_entry_send_button`
+   - `single_entry_status`
+   - `single_entry_detail`
+6. Add widget tests:
+   - `single_entry_panel_test.dart` for panel behavior and interaction split
+   - update `smoke_test.dart` for regression checks in Workbench shell
+
 B2 verification:
 
 - `cd apps/lazynote_flutter && flutter analyze`
@@ -99,7 +124,7 @@ B2 verification:
 
 - [x] Parser supports locked command grammar.
 - [x] Router cleanly distinguishes command vs search.
-- [ ] Error states keep input intact and expose readable messages.
+- [x] Error states keep input intact and expose readable messages.
 
 ## Progress Notes
 
@@ -118,5 +143,26 @@ B1 completed:
   - `test/entry_state_test.dart`
 - Verification passed:
   - `dart format lib test`
+  - `flutter analyze`
+  - `flutter test`
+
+B2 completed:
+
+- Added `single_entry_controller.dart` to own input controller, router invocation, and detail-action behavior.
+- Added `single_entry_panel.dart` with locked UI contract:
+  - placeholder `Ask me anything...`
+  - right icons `mic` + `send_outlined`
+  - send icon color switches gray/blue by input emptiness
+- Updated `entry_shell_page.dart`:
+  - Workbench button opens/focuses Single Entry panel
+  - panel stays inside left pane and does not replace Workbench shell
+  - hide/close behavior added
+- Added widget tests in `test/single_entry_panel_test.dart` for:
+  - panel open/close
+  - send icon color state
+  - onChanged preview vs Enter detail split
+  - parse error input preservation
+  - debug logs panel non-regression
+- Verification passed:
   - `flutter analyze`
   - `flutter test`

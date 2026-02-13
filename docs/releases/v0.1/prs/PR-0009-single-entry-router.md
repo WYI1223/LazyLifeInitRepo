@@ -11,8 +11,8 @@ Workbench remains the default homepage and log viewer shell.
 
 This work is split into four smaller PRs:
 
-1. `PR-0009A`: FFI and core use-case surface for entry operations.
-2. `PR-0009B`: Flutter parser/state scaffolding and command contract validation.
+1. `PR-0009A`: FFI and core use-case surface for entry operations. (Completed)
+2. `PR-0009B`: Flutter parser/state scaffolding and command contract validation. (Completed)
 3. `PR-0009C`: Search execution flow (default input -> search results).
 4. `PR-0009D`: Command execution flow (`> new note`, `> task`, `> schedule`).
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lazynote_flutter/features/diagnostics/rust_diagnostics_page.dart';
+import 'package:lazynote_flutter/features/entry/single_entry_controller.dart';
+import 'package:lazynote_flutter/features/entry/single_entry_panel.dart';
 import 'package:lazynote_flutter/features/entry/workbench_shell_layout.dart';
 
 /// Left-pane sections inside Workbench shell.
@@ -23,8 +25,10 @@ class EntryShellPage extends StatefulWidget {
 
 class _EntryShellPageState extends State<EntryShellPage> {
   final TextEditingController _inputController = TextEditingController();
+  final SingleEntryController _singleEntryController = SingleEntryController();
   String _status = 'Idle. Use the field below to validate UI behavior first.';
   late WorkbenchSection _activeSection;
+  bool _showSingleEntryPanel = false;
 
   @override
   void initState() {
@@ -35,6 +39,7 @@ class _EntryShellPageState extends State<EntryShellPage> {
   @override
   void dispose() {
     _inputController.dispose();
+    _singleEntryController.dispose();
     super.dispose();
   }
 
@@ -50,6 +55,21 @@ class _EntryShellPageState extends State<EntryShellPage> {
       _status = content.isEmpty
           ? 'No draft entered yet. Add text and validate again.'
           : 'Validated draft input: "$content"';
+    });
+  }
+
+  void _openOrFocusSingleEntryPanel() {
+    setState(() {
+      _showSingleEntryPanel = true;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _singleEntryController.requestFocus();
+    });
+  }
+
+  void _hideSingleEntryPanel() {
+    setState(() {
+      _showSingleEntryPanel = false;
     });
   }
 
@@ -99,6 +119,37 @@ class _EntryShellPageState extends State<EntryShellPage> {
             child: Text(_status, key: const Key('workbench_status')),
           ),
         ),
+        const SizedBox(height: 24),
+        Text('Single Entry', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            FilledButton(
+              key: const Key('open_single_entry_panel_button'),
+              onPressed: _openOrFocusSingleEntryPanel,
+              child: Text(
+                _showSingleEntryPanel
+                    ? 'Focus Single Entry'
+                    : 'Open Single Entry',
+              ),
+            ),
+            if (_showSingleEntryPanel)
+              OutlinedButton(
+                key: const Key('hide_single_entry_panel_button'),
+                onPressed: _hideSingleEntryPanel,
+                child: const Text('Hide Single Entry'),
+              ),
+          ],
+        ),
+        if (_showSingleEntryPanel) ...[
+          const SizedBox(height: 12),
+          SingleEntryPanel(
+            controller: _singleEntryController,
+            onClose: _hideSingleEntryPanel,
+          ),
+        ],
         const SizedBox(height: 24),
         Text('Diagnostics', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
