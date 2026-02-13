@@ -84,9 +84,12 @@ pub struct Atom {
     pub is_deleted: bool,
 }
 
+/// Validation errors for atom construction/deserialization/update boundaries.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AtomValidationError {
+    /// Stable ID must not be the all-zero UUID.
     NilUuid,
+    /// Event window is reversed (`end < start`).
     InvalidEventWindow { start: i64, end: i64 },
 }
 

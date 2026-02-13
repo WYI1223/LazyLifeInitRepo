@@ -19,12 +19,17 @@ mod open;
 
 pub use open::{open_db, open_db_in_memory};
 
+/// Result type for DB bootstrap/open/migration operations.
 pub type DbResult<T> = Result<T, DbError>;
 
+/// Database-layer error for connection bootstrap and schema migration.
 #[derive(Debug)]
 pub enum DbError {
+    /// Raw SQLite error returned by `rusqlite`.
     Sqlite(rusqlite::Error),
+    /// Internal migration registry definition is malformed.
     InvalidMigrationRegistry(&'static str),
+    /// Database schema version is newer than this binary supports.
     UnsupportedSchemaVersion {
         db_version: u32,
         latest_supported: u32,
