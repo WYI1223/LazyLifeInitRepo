@@ -152,7 +152,13 @@ impl<R: NoteRepository> NoteService<R> {
         limit: Option<u32>,
         offset: u32,
     ) -> Result<NotesListResult, NoteServiceError> {
-        let normalized_tag = tag.and_then(|value| normalize_tag(value.as_str()));
+        let normalized_tag = match tag {
+            Some(value) => match normalize_tag(value.as_str()) {
+                Some(normalized) => Some(normalized),
+                None => return Err(NoteServiceError::InvalidTag(value)),
+            },
+            None => None,
+        };
         let applied_limit = normalize_note_limit(limit);
         let query = NoteListQuery {
             tag: normalized_tag,
@@ -240,5 +246,37 @@ mod tests {
         assert!(!text.contains('#'));
         assert!(!text.contains('*'));
         assert!(text.len() <= 100);
+    }
+
+    #[test]
+    fn preview_handles_complex_markdown_and_unicode_text() {
+        let source = r#"
+# title heading
+
+> quote line
+
+![cover]( https://cdn.example.com/first.png )
+Paragraph with [ref](https://example.com/path?q=1) and **bold** + `code`.
+
+![second](two.png)
+"#;
+        let preview = derive_markdown_preview(source);
+        assert_eq!(
+            preview.preview_image.as_deref(),
+            Some("https://cdn.example.com/first.png")
+        );
+        let text = preview.preview_text.expect("preview_text should exist");
+        assert!(text.contains("title heading"));
+        assert!(text.contains("quote line"));
+        assert!(!text.contains("!["));
+        assert!(!text.contains("]("));
+        assert!(text.len() <= 100);
+    }
+
+    #[test]
+    fn preview_returns_none_for_symbol_only_content() {
+        let preview = derive_markdown_preview("### *** ``` ~~ []() ![]()");
+        assert!(preview.preview_text.is_none());
+        assert!(preview.preview_image.is_none());
     }
 }

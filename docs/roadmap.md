@@ -23,6 +23,10 @@ Status: Deferred until `PR-0010C` / `PR-0010D`.
 - Editor enhancements:
   - syntax highlight
   - faster markdown input helpers
+- Notes/tags repository performance hardening:
+  - optimize `notes_list` tag loading to remove N+1 query pattern
+  - candidate approaches: batch tag preload or grouped join aggregation
+  - tracking source: PR-0010B review decision (non-blocking for v0.1 core contract)
 
 ## Deferred / v0.2+
 

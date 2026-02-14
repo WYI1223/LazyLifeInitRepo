@@ -6,7 +6,7 @@
 //!
 //! # Invariants
 //! - Exported functions must not panic across FFI boundary.
-//! - Return values are UTF-8 strings with stable meaning.
+//! - Return envelopes keep `ok/error_code/message` semantics stable.
 //!
 //! # See also
 //! - docs/architecture/logging.md
@@ -685,7 +685,7 @@ fn map_repo_error(err: lazynote_core::RepoError) -> NotesFfiError {
                 "missing required column `{column}` in table `{table}`"
             ))
         }
-        lazynote_core::RepoError::InvalidData(details) => NotesFfiError::InvalidArgument(details),
+        lazynote_core::RepoError::InvalidData(details) => NotesFfiError::Internal(details),
     }
 }
 
@@ -709,8 +709,9 @@ fn atom_type_label(kind: AtomType) -> &'static str {
 mod tests {
     use super::{
         configure_entry_db_path, core_version, entry_create_note_impl, entry_create_task_impl,
-        entry_schedule_impl, entry_search_impl, init_logging, note_create_impl, note_get_impl,
-        note_set_tags_impl, note_update_impl, notes_list_impl, ping, tags_list_impl,
+        entry_schedule_impl, entry_search_impl, init_logging, map_repo_error, note_create_impl,
+        note_get_impl, note_set_tags_impl, note_update_impl, notes_list_impl, ping, tags_list_impl,
+        NotesFfiError,
     };
     use lazynote_core::db::open_db;
     use std::sync::{Mutex, MutexGuard};
@@ -906,11 +907,63 @@ mod tests {
     }
 
     #[test]
+    fn notes_list_rejects_blank_tag_with_invalid_tag_error_code() {
+        let _guard = acquire_test_db_lock();
+        let created = note_create_impl("blank tag filter source".to_string());
+        assert!(created.ok, "{}", created.message);
+
+        let response = notes_list_impl(Some("   ".to_string()), Some(20), Some(0));
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("invalid_tag"));
+    }
+
+    #[test]
+    fn note_set_tags_normalizes_values_and_refreshes_updated_at() {
+        let _guard = acquire_test_db_lock();
+        let created = note_create_impl("tag update target".to_string());
+        assert!(created.ok, "{}", created.message);
+        let atom_id = created
+            .note
+            .as_ref()
+            .expect("created note payload")
+            .atom_id
+            .clone();
+
+        let conn = open_db(super::resolve_entry_db_path()).expect("open db");
+        conn.execute(
+            "UPDATE atoms SET updated_at = 1000 WHERE uuid = ?1;",
+            [atom_id.as_str()],
+        )
+        .expect("set old updated_at");
+
+        let tagged = note_set_tags_impl(
+            atom_id,
+            vec![
+                "Work".to_string(),
+                "work".to_string(),
+                "Important".to_string(),
+            ],
+        );
+        assert!(tagged.ok, "{}", tagged.message);
+        let note = tagged.note.expect("note payload should exist");
+        assert_eq!(note.tags, vec!["important".to_string(), "work".to_string()]);
+        assert!(note.updated_at > 1000);
+    }
+
+    #[test]
     fn note_get_invalid_id_returns_error_code() {
         let _guard = acquire_test_db_lock();
         let response = note_get_impl("not-a-uuid".to_string());
         assert!(!response.ok);
         assert_eq!(response.error_code.as_deref(), Some("invalid_note_id"));
+    }
+
+    #[test]
+    fn invalid_persisted_data_maps_to_internal_error() {
+        let mapped = map_repo_error(lazynote_core::RepoError::InvalidData(
+            "broken row".to_string(),
+        ));
+        assert!(matches!(mapped, NotesFfiError::Internal(details) if details == "broken row"));
     }
 
     #[test]

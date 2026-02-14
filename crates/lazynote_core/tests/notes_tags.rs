@@ -149,3 +149,39 @@ fn set_note_tags_rejects_blank_tag_values() {
         .unwrap_err();
     assert!(matches!(err, NoteServiceError::InvalidTag(_)));
 }
+
+#[test]
+fn notes_list_rejects_blank_tag_filter() {
+    let mut conn = open_db_in_memory().unwrap();
+    let repo = SqliteNoteRepository::try_new(&mut conn).unwrap();
+    let service = NoteService::new(repo);
+    service.create_note("note one").unwrap();
+
+    let err = service
+        .list_notes(Some("   ".to_string()), Some(10), 0)
+        .unwrap_err();
+    assert!(matches!(err, NoteServiceError::InvalidTag(_)));
+}
+
+#[test]
+fn set_note_tags_refreshes_note_updated_at() {
+    let mut conn = open_db_in_memory().unwrap();
+    let created_id = {
+        let repo = SqliteNoteRepository::try_new(&mut conn).unwrap();
+        let service = NoteService::new(repo);
+        service.create_note("timestamp target").unwrap().atom_id
+    };
+
+    conn.execute(
+        "UPDATE atoms SET updated_at = 1000 WHERE uuid = ?1;",
+        params![created_id.to_string()],
+    )
+    .unwrap();
+
+    let repo = SqliteNoteRepository::try_new(&mut conn).unwrap();
+    let mut service = NoteService::new(repo);
+    let updated = service
+        .set_note_tags(created_id, vec!["work".to_string()])
+        .unwrap();
+    assert!(updated.updated_at > 1000);
+}

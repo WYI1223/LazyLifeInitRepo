@@ -24,6 +24,21 @@ fn create_and_get_roundtrip() {
 }
 
 #[test]
+fn create_and_get_roundtrip_preserves_preview_fields() {
+    let conn = open_db_in_memory().unwrap();
+    let repo = SqliteAtomRepository::try_new(&conn).unwrap();
+
+    let mut atom = Atom::new(AtomType::Note, "preview body");
+    atom.preview_text = Some("preview text".to_string());
+    atom.preview_image = Some("cover.png".to_string());
+    let id = repo.create_atom(&atom).unwrap();
+
+    let loaded = repo.get_atom(id, false).unwrap().unwrap();
+    assert_eq!(loaded.preview_text.as_deref(), Some("preview text"));
+    assert_eq!(loaded.preview_image.as_deref(), Some("cover.png"));
+}
+
+#[test]
 fn update_existing_atom() {
     let conn = open_db_in_memory().unwrap();
     let repo = SqliteAtomRepository::try_new(&conn).unwrap();
@@ -40,6 +55,23 @@ fn update_existing_atom() {
     assert_eq!(loaded.kind, AtomType::Task);
     assert_eq!(loaded.content, "updated task");
     assert_eq!(loaded.task_status, Some(TaskStatus::InProgress));
+}
+
+#[test]
+fn update_atom_updates_preview_fields() {
+    let conn = open_db_in_memory().unwrap();
+    let repo = SqliteAtomRepository::try_new(&conn).unwrap();
+
+    let mut atom = Atom::new(AtomType::Note, "draft");
+    repo.create_atom(&atom).unwrap();
+
+    atom.preview_text = Some("updated preview".to_string());
+    atom.preview_image = Some("updated.png".to_string());
+    repo.update_atom(&atom).unwrap();
+
+    let loaded = repo.get_atom(atom.uuid, false).unwrap().unwrap();
+    assert_eq!(loaded.preview_text.as_deref(), Some("updated preview"));
+    assert_eq!(loaded.preview_image.as_deref(), Some("updated.png"));
 }
 
 #[test]

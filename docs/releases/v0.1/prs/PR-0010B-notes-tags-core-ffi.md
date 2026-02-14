@@ -92,3 +92,15 @@ Out of scope:
 - [x] Single-tag filter returns expected note subset.
 - [x] Error codes are explicit and not string-parsed by Flutter.
 - [x] Core + FFI tests cover baseline success/failure paths.
+
+## Review Decisions
+
+- Accepted:
+  - map `RepoError::InvalidData` to `internal_error` (instead of `invalid_argument`)
+  - reject blank `notes_list(tag)` input with `invalid_tag`
+  - move `note_set_tags` existence check into the same transaction and refresh `updated_at`
+  - align FFI module comments with typed-envelope contracts
+- Deferred (not blocking PR-0010B):
+  - optimize `notes_list` tag loading to remove N+1 query pattern
+  - rationale: current v0.1 limit (`<=50`) keeps functional risk low; this is treated as a performance hardening item
+  - tracked in `docs/roadmap.md` for follow-up phase (`PR-0010D` or later)

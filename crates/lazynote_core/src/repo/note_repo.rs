@@ -15,7 +15,7 @@
 use crate::model::atom::{Atom, AtomId, AtomType};
 use crate::repo::atom_repo::{AtomRepository, RepoError, RepoResult, SqliteAtomRepository};
 use rusqlite::types::Value;
-use rusqlite::{params, params_from_iter, Connection};
+use rusqlite::{params, params_from_iter, Connection, Transaction, TransactionBehavior};
 use std::collections::BTreeSet;
 use uuid::Uuid;
 
@@ -214,12 +214,14 @@ impl NoteRepository for SqliteNoteRepository<'_> {
     }
 
     fn set_note_tags(&mut self, atom_id: AtomId, tags: &[String]) -> RepoResult<()> {
-        if !note_exists(self.conn, atom_id)? {
+        let atom_id_text = atom_id.to_string();
+        let tx = self
+            .conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if !note_exists_in_tx(&tx, atom_id_text.as_str())? {
             return Err(RepoError::NotFound(atom_id));
         }
 
-        let atom_id_text = atom_id.to_string();
-        let tx = self.conn.transaction()?;
         tx.execute(
             "DELETE FROM atom_tags WHERE atom_uuid = ?1;",
             [atom_id_text.as_str()],
@@ -238,6 +240,15 @@ impl NoteRepository for SqliteNoteRepository<'_> {
                 params![atom_id_text.as_str(), tag.as_str()],
             )?;
         }
+
+        tx.execute(
+            "UPDATE atoms
+             SET updated_at = (strftime('%s', 'now') * 1000)
+             WHERE uuid = ?1
+               AND type = 'note'
+               AND is_deleted = 0;",
+            [atom_id_text.as_str()],
+        )?;
 
         tx.commit()?;
         Ok(())
@@ -310,16 +321,16 @@ fn load_tags_for_note(conn: &Connection, atom_uuid: &str) -> RepoResult<Vec<Stri
     Ok(tags)
 }
 
-fn note_exists(conn: &Connection, atom_id: AtomId) -> RepoResult<bool> {
-    let exists: i64 = conn.query_row(
+fn note_exists_in_tx(tx: &Transaction<'_>, atom_uuid: &str) -> RepoResult<bool> {
+    let exists: i64 = tx.query_row(
         "SELECT EXISTS(
             SELECT 1
             FROM atoms
-            WHERE uuid = ?1
-              AND type = 'note'
-              AND is_deleted = 0
+             WHERE uuid = ?1
+               AND type = 'note'
+               AND is_deleted = 0
         );",
-        [atom_id.to_string()],
+        [atom_uuid],
         |row| row.get(0),
     )?;
     Ok(exists == 1)

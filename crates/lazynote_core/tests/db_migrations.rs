@@ -17,6 +17,28 @@ fn open_db_in_memory_applies_all_migrations() {
 }
 
 #[test]
+fn migrated_preview_columns_accept_read_write_values() {
+    let conn = open_db_in_memory().unwrap();
+    let atom_id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO atoms (uuid, type, content, preview_text, preview_image)
+         VALUES (?1, 'note', 'body', 'summary', 'cover.png');",
+        [atom_id.as_str()],
+    )
+    .unwrap();
+
+    let loaded: (Option<String>, Option<String>) = conn
+        .query_row(
+            "SELECT preview_text, preview_image FROM atoms WHERE uuid = ?1;",
+            [atom_id.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!(loaded.0.as_deref(), Some("summary"));
+    assert_eq!(loaded.1.as_deref(), Some("cover.png"));
+}
+
+#[test]
 fn opening_same_database_twice_is_idempotent() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("lazynote.db");
