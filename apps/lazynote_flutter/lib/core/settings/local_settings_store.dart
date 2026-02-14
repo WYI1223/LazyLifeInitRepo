@@ -10,6 +10,7 @@ class LocalSettingsStore {
   static bool _initialized = false;
   static Future<void>? _initFuture;
   static EntryUiTuning _entryUiTuning = const EntryUiTuning.defaults();
+  static String? _loggingLevelOverride;
 
   @visibleForTesting
   static Future<String> Function() settingsFilePathResolver =
@@ -35,6 +36,7 @@ class LocalSettingsStore {
     _initialized = false;
     _initFuture = null;
     _entryUiTuning = const EntryUiTuning.defaults();
+    _loggingLevelOverride = null;
     settingsFilePathResolver = LocalPaths.resolveSettingsFilePath;
     logger =
         ({required String message, Object? error, StackTrace? stackTrace}) {
@@ -49,6 +51,13 @@ class LocalSettingsStore {
 
   /// Effective Single Entry UI tuning values loaded from local settings.
   static EntryUiTuning get entryUiTuning => _entryUiTuning;
+
+  /// Raw logging level override parsed from settings file.
+  ///
+  /// v0.1 contract:
+  /// - This value is persisted and validated.
+  /// - Runtime logging behavior is not changed by this field yet.
+  static String? get loggingLevelOverride => _loggingLevelOverride;
 
   /// Creates `settings.json` with defaults when missing.
   ///
@@ -76,14 +85,13 @@ class LocalSettingsStore {
       final file = File(settingsPath);
       if (await file.exists()) {
         await _backfillMissingDefaults(file);
-        await _loadRuntimeTuning(file);
+        await _loadRuntimeSettings(file);
         _initialized = true;
         return;
       }
 
-      await file.parent.create(recursive: true);
-      await file.writeAsString(_defaultSettingsJson, flush: true);
-      await _loadRuntimeTuning(file);
+      await _writeFileWithTempReplace(file, _defaultSettingsJson);
+      await _loadRuntimeSettings(file);
       _initialized = true;
     } catch (error, stackTrace) {
       logger(
@@ -116,7 +124,7 @@ class EntryUiTuning {
   final int animationMs;
 }
 
-Future<void> _loadRuntimeTuning(File file) async {
+Future<void> _loadRuntimeSettings(File file) async {
   try {
     final raw = await file.readAsString();
     final decoded = jsonDecode(raw);
@@ -158,13 +166,25 @@ Future<void> _loadRuntimeTuning(File file) async {
       expandedMaxHeight: expanded >= collapsed + 80 ? expanded : collapsed + 80,
       animationMs: animationMs,
     );
+
+    final logging = decoded['logging'];
+    if (logging is Map<String, dynamic>) {
+      final levelOverride = _readLoggingLevelOverride(
+        logging['level_override'],
+      );
+      LocalSettingsStore._loggingLevelOverride = levelOverride;
+    } else {
+      LocalSettingsStore._loggingLevelOverride = null;
+    }
   } catch (error, stackTrace) {
     LocalSettingsStore.logger(
-      message: 'Failed to parse entry.ui settings; falling back to defaults.',
+      message:
+          'Failed to parse runtime settings (entry.ui/logging); falling back to defaults.',
       error: error,
       stackTrace: stackTrace,
     );
     LocalSettingsStore._entryUiTuning = const EntryUiTuning.defaults();
+    LocalSettingsStore._loggingLevelOverride = null;
   }
 }
 
@@ -235,7 +255,7 @@ Future<void> _backfillMissingDefaults(File file) async {
     }
 
     const encoder = JsonEncoder.withIndent('  ');
-    await file.writeAsString('${encoder.convert(decoded)}\n', flush: true);
+    await _writeFileWithTempReplace(file, '${encoder.convert(decoded)}\n');
   } catch (error, stackTrace) {
     LocalSettingsStore.logger(
       message:
@@ -243,6 +263,40 @@ Future<void> _backfillMissingDefaults(File file) async {
       error: error,
       stackTrace: stackTrace,
     );
+  }
+}
+
+String? _readLoggingLevelOverride(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  final normalized = switch (value) {
+    String v => v.trim().toLowerCase(),
+    _ => '',
+  };
+  return switch (normalized) {
+    'trace' || 'debug' || 'info' || 'warn' || 'error' => normalized,
+    _ => null,
+  };
+}
+
+Future<void> _writeFileWithTempReplace(File target, String content) async {
+  await target.parent.create(recursive: true);
+  final timestamp = DateTime.now().microsecondsSinceEpoch;
+  final temp = File('${target.path}.tmp.$timestamp');
+  await temp.writeAsString(content, flush: true);
+
+  try {
+    // Why: on POSIX, rename-over-existing is typically atomic; keep this fast
+    // path first and fall back to replace semantics for platforms that reject
+    // rename when destination already exists.
+    await temp.rename(target.path);
+    return;
+  } catch (_) {
+    if (await target.exists()) {
+      await target.delete();
+    }
+    await temp.rename(target.path);
   }
 }
 

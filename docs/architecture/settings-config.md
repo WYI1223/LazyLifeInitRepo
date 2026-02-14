@@ -120,6 +120,7 @@ This includes:
 
 - nullable string enum: `trace | debug | info | warn | error`
 - `null` means use build defaults/runtime policy
+- v0.1 behavior: value is validated and persisted, but not applied at runtime yet
 
 ## Read/Write Behavior
 
@@ -135,14 +136,15 @@ Write path:
 
 1. Serialize validated settings object.
 2. Write to temp file in same directory.
-3. Atomically replace target file.
+3. Replace target file from temp (`rename-over-existing` where supported, fallback replace otherwise).
 4. On failure, keep previous file untouched and report warning.
 
 ## Runtime Apply Order
 
 1. Load settings early in app bootstrap.
 2. Apply UI behavior settings before rendering major shells when possible.
-3. Apply runtime bridge settings before first command/search execution if required.
+3. Runtime bridge settings are applied before first command/search execution when required.
+4. `logging.level_override` is reserved in v0.1 (persist-only, no runtime apply yet).
 
 ### Startup policy (v0.1)
 

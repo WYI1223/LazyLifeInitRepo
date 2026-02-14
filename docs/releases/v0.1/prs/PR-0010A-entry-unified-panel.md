@@ -104,12 +104,12 @@ Implementation note:
 
 ## Acceptance Criteria
 
-- [ ] Single Entry renders as one unified floating card.
-- [ ] Results panel seamlessly attaches below input section.
-- [ ] Divider style uses `indent/endIndent = 16.0`.
-- [ ] Results area has exactly one scrollbar with 16px track endpoint margin.
-- [ ] Expand/collapse behavior matches interaction contract.
-- [ ] `Esc` quick reset behavior works (clear input + close detail).
-- [ ] Desktop hover feedback is visible on result rows.
-- [ ] Workbench right logs panel remains unaffected.
-- [ ] `flutter analyze` and `flutter test` pass.
+- [x] Single Entry renders as one unified floating card.
+- [x] Results panel seamlessly attaches below input section.
+- [x] Divider style uses `indent/endIndent = 16.0`.
+- [x] Results area has exactly one scrollbar with 16px track endpoint margin.
+- [x] Expand/collapse behavior matches interaction contract.
+- [x] `Esc` quick reset behavior works (clear input + close detail).
+- [x] Desktop hover feedback is visible on result rows.
+- [x] Workbench right logs panel remains unaffected.
+- [x] `flutter analyze` and `flutter test` pass.

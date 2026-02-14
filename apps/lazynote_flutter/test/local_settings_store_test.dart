@@ -112,5 +112,79 @@ void main() {
     expect(LocalSettingsStore.entryUiTuning.collapsedHeight, 80);
     expect(LocalSettingsStore.entryUiTuning.expandedMaxHeight, 500);
     expect(LocalSettingsStore.entryUiTuning.animationMs, 220);
+    expect(LocalSettingsStore.loggingLevelOverride, isNull);
+  });
+
+  test(
+    'loads validated logging level override as persisted-only field',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp(
+        'lazynote-settings-',
+      );
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
+
+      final settingsPath =
+          '${tempDir.path}${Platform.pathSeparator}settings.json';
+      final existing = File(settingsPath);
+      await existing.parent.create(recursive: true);
+      await existing.writeAsString('''
+{
+  "schema_version": 1,
+  "entry": {
+    "ui": {
+      "collapsed_height": 72,
+      "expanded_max_height": 420,
+      "animation_ms": 180
+    }
+  },
+  "logging": {
+    "level_override": "debug"
+  }
+}
+''');
+
+      LocalSettingsStore.settingsFilePathResolver = () async => settingsPath;
+      await LocalSettingsStore.ensureInitialized();
+
+      expect(LocalSettingsStore.loggingLevelOverride, 'debug');
+    },
+  );
+
+  test('invalid logging level override falls back to null', () async {
+    final tempDir = await Directory.systemTemp.createTemp('lazynote-settings-');
+    addTearDown(() async {
+      if (await tempDir.exists()) {
+        await tempDir.delete(recursive: true);
+      }
+    });
+
+    final settingsPath =
+        '${tempDir.path}${Platform.pathSeparator}settings.json';
+    final existing = File(settingsPath);
+    await existing.parent.create(recursive: true);
+    await existing.writeAsString('''
+{
+  "schema_version": 1,
+  "entry": {
+    "ui": {
+      "collapsed_height": 72,
+      "expanded_max_height": 420,
+      "animation_ms": 180
+    }
+  },
+  "logging": {
+    "level_override": "verbose"
+  }
+}
+''');
+
+    LocalSettingsStore.settingsFilePathResolver = () async => settingsPath;
+    await LocalSettingsStore.ensureInitialized();
+
+    expect(LocalSettingsStore.loggingLevelOverride, isNull);
   });
 }
