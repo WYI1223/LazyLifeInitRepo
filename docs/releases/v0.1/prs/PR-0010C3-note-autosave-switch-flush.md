@@ -100,6 +100,23 @@ Out of scope:
    - Symptom: persistent save failures could spawn repeated retries.
    - Root cause: queue drain condition retried on dirty state rather than true queued intent.
    - Solution: queue follow-up save only when explicit queued signal exists.
+5. Fixed tab-close data loss gaps.
+   - Symptom: closing active last tab or tab-pruning actions could bypass flush and drop unsaved draft.
+   - Root cause: `closeOpenNote` / `closeOtherOpenNotes` / `closeOpenNotesToRight` changed tab state directly without enforcing flush guard.
+   - Solution:
+     - all three close helpers now return `bool` and enforce flush-before-close semantics when active dirty draft is involved
+     - close operation is blocked on flush failure, preserving current tab/draft state
+6. Fixed window-close pending-save blind spot.
+   - Symptom: close interception only checked active note, so non-active pending work could be missed.
+   - Root cause: `hasPendingSaveWork` only evaluated active note dirty/in-flight status.
+   - Solution: `hasPendingSaveWork` now scans active note plus all open tabs for dirty/in-flight saves.
+7. Fixed top action bar clipping and interaction inconsistency in narrow windows.
+   - Symptom: right-side action cluster could clip in narrow width; long/short UI "..." behavior diverged.
+   - Root cause: fixed action set in compact space and mixed interaction models.
+   - Solution:
+     - narrow width collapses secondary actions into one overflow menu
+     - wide width keeps direct `Share` and `Star`, and uses matching dropdown-based `...` action for consistency
+     - save error detail remains in banner; top status stays compact to protect action layout
 
 ## Incident Notes
 
@@ -136,6 +153,7 @@ Out of scope:
 - `cd apps/lazynote_flutter && flutter test test/notes_page_c1_test.dart`
 - `cd apps/lazynote_flutter && flutter test test/notes_page_c2_test.dart`
 - `cd apps/lazynote_flutter && flutter test test/notes_page_c3_test.dart`
+- `cd apps/lazynote_flutter && flutter test test/notes_controller_tabs_test.dart`
 - `cd apps/lazynote_flutter && flutter test`
 
 ## Manual Verification (Windows)
@@ -162,6 +180,22 @@ Out of scope:
    - force save failure
    - click note B
    - expected: switch blocked, stay on note A, banner shows save failure guidance
+6. Tab close guard:
+   - edit active note and click tab close `x`
+   - expected:
+     - save success: close proceeds
+     - save failure: close blocked, tab and draft remain
+7. Close Others / Close Right guard:
+   - make active note dirty, then trigger tab context close actions
+   - expected:
+     - actions that would prune active tab must flush first
+     - flush failure blocks action and preserves tab set
+8. Responsive top actions:
+   - resize window from wide to narrow
+   - expected:
+     - narrow: compact overflow menu appears
+     - wide: direct `Share`/`Star` + dropdown `...` remains visible
+     - no right-side clipping/half-hidden button
 
 ## Acceptance Criteria
 
@@ -171,3 +205,6 @@ Out of scope:
 - [x] Stale save completion cannot overwrite newer editor state.
 - [x] Close path is fast when no pending save work exists.
 - [x] Save-error UI does not overlap top-right action buttons.
+- [x] Tab close actions respect flush guard and block on flush failure.
+- [x] Window close interception covers pending save work across all open tabs.
+- [x] Top action bar remains usable in narrow and wide layouts without clipping.

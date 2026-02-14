@@ -147,6 +147,108 @@ void main() {
     expect(find.byKey(const Key('notes_save_status_error')), findsOneWidget);
   });
 
+  testWidgets('top action area collapses into overflow on narrow width', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(760, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final base = note(atomId: 'note-1', content: '# Seed', updatedAt: 1000);
+    final controller = NotesController(
+      prepare: () async {},
+      notesListInvoker: ({tag, limit, offset}) async {
+        return rust_api.NotesListResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          appliedLimit: 50,
+          items: [base],
+        );
+      },
+      noteGetInvoker: ({required atomId}) async {
+        return rust_api.NoteResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          note: base,
+        );
+      },
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      wrapWithMaterial(NotesPage(controller: controller)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('notes_detail_overflow_menu_button')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('notes_detail_share_button')), findsNothing);
+    expect(find.byKey(const Key('notes_detail_star_button')), findsNothing);
+    expect(
+      find.byKey(const Key('notes_detail_more_menu_button')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('top action area keeps direct buttons on wide width', (
+    WidgetTester tester,
+  ) async {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = const Size(1800, 900);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    final base = note(atomId: 'note-1', content: '# Seed', updatedAt: 1000);
+    final controller = NotesController(
+      prepare: () async {},
+      notesListInvoker: ({tag, limit, offset}) async {
+        return rust_api.NotesListResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          appliedLimit: 50,
+          items: [base],
+        );
+      },
+      noteGetInvoker: ({required atomId}) async {
+        return rust_api.NoteResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          note: base,
+        );
+      },
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      wrapWithMaterial(NotesPage(controller: controller)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(
+      find.byKey(const Key('notes_detail_overflow_menu_button')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('notes_detail_share_button')), findsOneWidget);
+    expect(find.byKey(const Key('notes_detail_star_button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('notes_detail_more_menu_button')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('C3.2 blocks note switch when flush fails', (
     WidgetTester tester,
   ) async {
@@ -202,6 +304,68 @@ void main() {
     await tester.pump();
     await tester.pump();
 
+    expect(controller.activeNoteId, 'note-1');
+    expect(
+      find.byKey(const Key('notes_switch_block_error_banner')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('C3.2 blocks closing active tab when flush fails', (
+    WidgetTester tester,
+  ) async {
+    final store = <String, rust_api.NoteItem>{
+      'note-1': note(atomId: 'note-1', content: '# One', updatedAt: 2000),
+    };
+
+    final controller = NotesController(
+      prepare: () async {},
+      autosaveDebounce: const Duration(seconds: 10),
+      notesListInvoker: ({tag, limit, offset}) async {
+        return rust_api.NotesListResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          appliedLimit: 50,
+          items: [store['note-1']!],
+        );
+      },
+      noteGetInvoker: ({required atomId}) async {
+        return rust_api.NoteResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          note: store[atomId],
+        );
+      },
+      noteUpdateInvoker: ({required atomId, required content}) async {
+        return const rust_api.NoteResponse(
+          ok: false,
+          errorCode: 'db_error',
+          message: 'write failed',
+          note: null,
+        );
+      },
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      wrapWithMaterial(NotesPage(controller: controller)),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.enterText(
+      find.byKey(const Key('note_editor_field')),
+      '# One*',
+    );
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('note_tab_close_note-1')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(controller.openNoteIds, ['note-1']);
     expect(controller.activeNoteId, 'note-1');
     expect(
       find.byKey(const Key('notes_switch_block_error_banner')),

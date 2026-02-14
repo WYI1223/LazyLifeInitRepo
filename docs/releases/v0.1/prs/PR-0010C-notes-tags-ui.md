@@ -144,6 +144,15 @@ This PR line follows `docs/architecture/code-comment-standards.md`:
    - switch-block banner text normalized to valid UTF-8 English copy
 5. Test stability fix:
    - save queue follow-up logic adjusted to avoid retry storms on persistent write failures
+6. Tab safety fix:
+   - tab close helpers now enforce flush guard semantics instead of direct state mutation
+   - close is blocked on flush failure to prevent unsaved draft loss
+7. Global close guard fix:
+   - pending-save detection now includes all open tabs (not only active tab)
+8. Responsive action bar hardening:
+   - narrow width uses compact overflow action model to avoid clipping
+   - wide and narrow now share dropdown-based `...` interaction contract
+   - final behavior validated in manual narrow/window resize runs
 
 ## Execution Specs (Split Files)
 

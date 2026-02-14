@@ -194,13 +194,19 @@ class NotesController extends ChangeNotifier {
 
   /// Whether active note has pending save work before app close.
   ///
-  /// Includes dirty drafts and in-flight save requests.
+  /// Includes dirty drafts and in-flight save requests for all open tabs.
   bool get hasPendingSaveWork {
-    final atomId = _activeNoteId;
-    if (atomId == null) {
-      return false;
+    if (_activeNoteId case final active?) {
+      if (_hasPendingSaveFor(active)) {
+        return true;
+      }
     }
-    return _isDirty(atomId) || _saveFutureByAtomId.containsKey(atomId);
+    for (final atomId in _openNoteIds) {
+      if (_hasPendingSaveFor(atomId)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Monotonic token used by UI to request editor focus.
@@ -566,16 +572,26 @@ class NotesController extends ChangeNotifier {
   ///
   /// Side effects:
   /// - When closing active tab, selects deterministic fallback tab.
+  /// - Flushes active draft before close to avoid data loss.
   /// - Clears selected detail state when the last tab is closed.
-  Future<void> closeOpenNote(String atomId) async {
+  ///
+  /// Returns `false` when close is blocked by flush failure.
+  Future<bool> closeOpenNote(String atomId) async {
     final closedIndex = _openNoteIds.indexOf(atomId);
     if (closedIndex < 0) {
-      return;
+      return false;
     }
+    if (_activeNoteId == atomId) {
+      final flushed = await flushPendingSave();
+      if (!flushed) {
+        return false;
+      }
+    }
+
     _openNoteIds.removeAt(closedIndex);
     if (_activeNoteId != atomId) {
       notifyListeners();
-      return;
+      return true;
     }
 
     if (_openNoteIds.isEmpty) {
@@ -588,7 +604,7 @@ class NotesController extends ChangeNotifier {
       _autosaveTimer?.cancel();
       _setSaveState(NoteSaveState.clean);
       notifyListeners();
-      return;
+      return true;
     }
 
     final fallbackIndex = (closedIndex - 1).clamp(0, _openNoteIds.length - 1);
@@ -602,38 +618,51 @@ class NotesController extends ChangeNotifier {
     _requestEditorFocus();
     notifyListeners();
     await _loadSelectedDetail(atomId: fallbackId);
+    return true;
   }
 
   /// Closes all tabs except [atomId], then activates [atomId].
-  Future<void> closeOtherOpenNotes(String atomId) async {
+  ///
+  /// Returns `false` when switch/close is blocked by flush failure.
+  Future<bool> closeOtherOpenNotes(String atomId) async {
     if (!_openNoteIds.contains(atomId)) {
-      return;
+      return false;
+    }
+    final switched = await activateOpenNote(atomId);
+    if (!switched) {
+      return false;
     }
     _openNoteIds
       ..clear()
       ..add(atomId);
-    _activeNoteId = atomId;
-    _selectedNote = noteById(atomId);
-    _activeDraftAtomId = atomId;
-    _activeDraftContent =
-        _draftContentByAtomId[atomId] ?? _selectedNote?.content ?? '';
-    _refreshSaveStateForActive();
-    _requestEditorFocus();
     notifyListeners();
-    await _loadSelectedDetail(atomId: atomId);
+    return true;
   }
 
   /// Closes tabs to the right of [atomId].
   ///
   /// Side effects:
+  /// - Flushes active draft when active tab would be removed.
   /// - Re-activates [atomId] if active tab was pruned by this operation.
-  Future<void> closeOpenNotesToRight(String atomId) async {
+  ///
+  /// Returns `false` when close is blocked by flush failure.
+  Future<bool> closeOpenNotesToRight(String atomId) async {
     final index = _openNoteIds.indexOf(atomId);
     if (index < 0) {
-      return;
+      return false;
     }
     if (index == _openNoteIds.length - 1) {
-      return;
+      return true;
+    }
+
+    final activeId = _activeNoteId;
+    final willPruneActive =
+        activeId != null && _openNoteIds.indexOf(activeId) > index;
+    if (willPruneActive) {
+      final flushed = await flushPendingSave();
+      if (!flushed) {
+        return false;
+      }
     }
     _openNoteIds.removeRange(index + 1, _openNoteIds.length);
     if (!_openNoteIds.contains(_activeNoteId)) {
@@ -646,9 +675,10 @@ class NotesController extends ChangeNotifier {
       _requestEditorFocus();
       notifyListeners();
       await _loadSelectedDetail(atomId: atomId);
-      return;
+      return true;
     }
     notifyListeners();
+    return true;
   }
 
   /// Updates active note draft content in-memory.
@@ -811,6 +841,10 @@ class NotesController extends ChangeNotifier {
       return false;
     }
     return draft != persisted;
+  }
+
+  bool _hasPendingSaveFor(String atomId) {
+    return _isDirty(atomId) || _saveFutureByAtomId.containsKey(atomId);
   }
 
   void _scheduleAutosave({required String atomId, required int version}) {

@@ -89,64 +89,37 @@ class NoteContentArea extends StatelessWidget {
                 key: const Key('notes_detail_editor'),
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Vibe Coding for LazyLife > Private',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: kNotesSecondaryText),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _SaveStatusWidget(controller: controller),
-                                const SizedBox(width: 6),
-                                IconButton(
-                                  key: const Key('notes_detail_refresh_button'),
-                                  tooltip: 'Refresh detail',
-                                  onPressed: controller.refreshSelectedDetail,
-                                  icon: const Icon(
-                                    Icons.refresh,
-                                    color: kNotesSecondaryText,
-                                  ),
-                                  iconSize: 18,
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                                _TopActionButton(
-                                  label: 'Share',
-                                  onPressed: () {},
-                                ),
-                                _TopActionButton(
-                                  icon: Icons.star_border,
-                                  onPressed: () {},
-                                ),
-                                _TopActionButton(
-                                  icon: Icons.more_horiz,
-                                  onPressed: () {},
-                                ),
-                              ],
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Why: in narrow windows keep action area stable by
+                      // collapsing secondary actions into one overflow menu.
+                      final compactActions = constraints.maxWidth < 520;
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Vibe Coding for LazyLife > Private',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(color: kNotesSecondaryText),
                             ),
                           ),
-                        ),
-                      ),
-                      if (controller.detailLoading)
-                        const SizedBox(
-                          key: Key('notes_detail_loading'),
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                    ],
+                          const SizedBox(width: 8),
+                          _TopActionCluster(
+                            controller: controller,
+                            compact: compactActions,
+                          ),
+                          if (controller.detailLoading)
+                            const SizedBox(
+                              key: Key('notes_detail_loading'),
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        ],
+                      );
+                    },
                   ),
                   if (controller.switchBlockErrorMessage
                       case final guardError?) ...[
@@ -279,8 +252,14 @@ class NoteContentArea extends StatelessWidget {
 }
 
 class _TopActionButton extends StatelessWidget {
-  const _TopActionButton({this.label, this.icon, required this.onPressed});
+  const _TopActionButton({
+    this.buttonKey,
+    this.label,
+    this.icon,
+    required this.onPressed,
+  });
 
+  final Key? buttonKey;
   final String? label;
   final IconData? icon;
   final VoidCallback onPressed;
@@ -289,6 +268,7 @@ class _TopActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (label case final value?) {
       return TextButton(
+        key: buttonKey,
         onPressed: onPressed,
         style: TextButton.styleFrom(
           foregroundColor: kNotesSecondaryText,
@@ -298,9 +278,13 @@ class _TopActionButton extends StatelessWidget {
       );
     }
     return IconButton(
+      key: buttonKey,
       onPressed: onPressed,
       icon: Icon(icon, color: kNotesSecondaryText),
       iconSize: 18,
+      constraints: const BoxConstraints.tightFor(width: 40, height: 40),
+      padding: EdgeInsets.zero,
+      splashRadius: 18,
       visualDensity: VisualDensity.compact,
       tooltip: '',
     );
@@ -308,9 +292,10 @@ class _TopActionButton extends StatelessWidget {
 }
 
 class _SaveStatusWidget extends StatelessWidget {
-  const _SaveStatusWidget({required this.controller});
+  const _SaveStatusWidget({required this.controller, required this.compact});
 
   final NotesController controller;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -326,38 +311,64 @@ class _SaveStatusWidget extends StatelessWidget {
         return Row(
           key: const Key('notes_save_status_saved'),
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.check, size: 14, color: Color(0xFF2E7D32)),
-            SizedBox(width: 4),
-            Text('Saved'),
+          children: [
+            const Icon(Icons.check, size: 14, color: Color(0xFF2E7D32)),
+            if (!compact) ...const [SizedBox(width: 4), Text('Saved')],
           ],
         );
       case NoteSaveState.dirty:
         return Row(
           key: const Key('notes_save_status_dirty'),
           mainAxisSize: MainAxisSize.min,
-          children: const [
-            Icon(Icons.circle, size: 7, color: kNotesSecondaryText),
-            SizedBox(width: 5),
-            Text('Unsaved'),
+          children: [
+            const Icon(Icons.circle, size: 7, color: kNotesSecondaryText),
+            if (!compact) ...const [SizedBox(width: 5), Text('Unsaved')],
           ],
         );
       case NoteSaveState.saving:
         return Row(
           key: const Key('notes_save_status_saving'),
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             SizedBox(
               width: 12,
               height: 12,
               child: CircularProgressIndicator(strokeWidth: 1.8),
             ),
-            SizedBox(width: 6),
-            Text('Saving...'),
+            if (!compact) ...const [SizedBox(width: 6), Text('Saving...')],
           ],
         );
       case NoteSaveState.error:
         final fullError = controller.saveErrorMessage ?? 'Save failed';
+        if (compact) {
+          return Row(
+            key: const Key('notes_save_status_error'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Tooltip(
+                message: fullError,
+                child: const Icon(
+                  Icons.error_outline,
+                  size: 14,
+                  color: Colors.redAccent,
+                ),
+              ),
+              IconButton(
+                key: const Key('notes_save_retry_button'),
+                onPressed: () {
+                  controller.retrySaveCurrentDraft();
+                },
+                icon: const Icon(
+                  Icons.refresh,
+                  size: 14,
+                  color: Colors.redAccent,
+                ),
+                tooltip: 'Retry save',
+                visualDensity: VisualDensity.compact,
+              ),
+            ],
+          );
+        }
         return Row(
           key: const Key('notes_save_status_error'),
           mainAxisSize: MainAxisSize.min,
@@ -397,6 +408,76 @@ class _SaveStatusWidget extends StatelessWidget {
           ],
         );
     }
+  }
+}
+
+enum _TopOverflowAction { share, star, more }
+
+class _TopActionCluster extends StatelessWidget {
+  const _TopActionCluster({required this.controller, required this.compact});
+
+  final NotesController controller;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _SaveStatusWidget(controller: controller, compact: compact),
+        const SizedBox(width: 6),
+        IconButton(
+          key: const Key('notes_detail_refresh_button'),
+          tooltip: 'Refresh detail',
+          onPressed: controller.refreshSelectedDetail,
+          icon: const Icon(Icons.refresh, color: kNotesSecondaryText),
+          iconSize: 18,
+          visualDensity: VisualDensity.compact,
+        ),
+        if (compact)
+          const _MoreActionsMenuButton(
+            buttonKey: Key('notes_detail_overflow_menu_button'),
+          )
+        else ...[
+          _TopActionButton(
+            buttonKey: const Key('notes_detail_share_button'),
+            label: 'Share',
+            onPressed: () {},
+          ),
+          _TopActionButton(
+            buttonKey: const Key('notes_detail_star_button'),
+            icon: Icons.star_border,
+            onPressed: () {},
+          ),
+          const _MoreActionsMenuButton(
+            buttonKey: Key('notes_detail_more_menu_button'),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _MoreActionsMenuButton extends StatelessWidget {
+  const _MoreActionsMenuButton({required this.buttonKey});
+
+  final Key buttonKey;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_TopOverflowAction>(
+      key: buttonKey,
+      tooltip: 'More actions',
+      onSelected: (_) {},
+      itemBuilder: (context) {
+        return const [
+          PopupMenuItem(value: _TopOverflowAction.share, child: Text('Share')),
+          PopupMenuItem(value: _TopOverflowAction.star, child: Text('Star')),
+          PopupMenuItem(value: _TopOverflowAction.more, child: Text('More')),
+        ];
+      },
+      icon: const Icon(Icons.more_horiz, size: 18, color: kNotesSecondaryText),
+    );
   }
 }
 

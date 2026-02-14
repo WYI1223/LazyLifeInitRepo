@@ -197,6 +197,7 @@ class _NoteTabManagerState extends State<NoteTabManager> {
                   ),
                   const SizedBox(width: 2),
                   InkWell(
+                    key: Key('note_tab_close_$noteId'),
                     splashFactory: NoSplash.splashFactory,
                     highlightColor: Colors.transparent,
                     onTap: () {
