@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
@@ -25,6 +26,16 @@ typedef NoteUpdateInvoker =
     Future<rust_api.NoteResponse> Function({
       required String atomId,
       required String content,
+    });
+
+/// Async loader for normalized tag list snapshots.
+typedef TagsListInvoker = Future<rust_api.TagsListResponse> Function();
+
+/// Async mutator that atomically replaces tags for one note.
+typedef NoteSetTagsInvoker =
+    Future<rust_api.NoteResponse> Function({
+      required String atomId,
+      required List<String> tags,
     });
 
 /// Timer factory for autosave debounce scheduling.
@@ -90,6 +101,8 @@ class NotesController extends ChangeNotifier {
     NoteGetInvoker? noteGetInvoker,
     NoteCreateInvoker? noteCreateInvoker,
     NoteUpdateInvoker? noteUpdateInvoker,
+    TagsListInvoker? tagsListInvoker,
+    NoteSetTagsInvoker? noteSetTagsInvoker,
     DebounceTimerFactory? debounceTimerFactory,
     NotesPrepare? prepare,
     this.listLimit = 50,
@@ -98,6 +111,8 @@ class NotesController extends ChangeNotifier {
        _noteGetInvoker = noteGetInvoker ?? _defaultNoteGetInvoker,
        _noteCreateInvoker = noteCreateInvoker ?? _defaultNoteCreateInvoker,
        _noteUpdateInvoker = noteUpdateInvoker ?? _defaultNoteUpdateInvoker,
+       _tagsListInvoker = tagsListInvoker ?? _defaultTagsListInvoker,
+       _noteSetTagsInvoker = noteSetTagsInvoker ?? _defaultNoteSetTagsInvoker,
        _debounceTimerFactory = debounceTimerFactory ?? Timer.new,
        _prepare = prepare ?? _defaultPrepare;
 
@@ -105,6 +120,8 @@ class NotesController extends ChangeNotifier {
   final NoteGetInvoker _noteGetInvoker;
   final NoteCreateInvoker _noteCreateInvoker;
   final NoteUpdateInvoker _noteUpdateInvoker;
+  final TagsListInvoker _tagsListInvoker;
+  final NoteSetTagsInvoker _noteSetTagsInvoker;
   final DebounceTimerFactory _debounceTimerFactory;
   final NotesPrepare _prepare;
 
@@ -117,6 +134,10 @@ class NotesController extends ChangeNotifier {
   NotesListPhase _listPhase = NotesListPhase.idle;
   List<rust_api.NoteItem> _items = const [];
   String? _listErrorMessage;
+  bool _tagsLoading = false;
+  List<String> _availableTags = const [];
+  String? _tagsErrorMessage;
+  String? _selectedTag;
 
   rust_api.NoteItem? _selectedNote;
   bool _detailLoading = false;
@@ -142,10 +163,12 @@ class NotesController extends ChangeNotifier {
   final Map<String, Future<bool>> _saveFutureByAtomId =
       <String, Future<bool>>{};
   final Map<String, bool> _saveQueuedByAtomId = <String, bool>{};
+  final Set<String> _tagSaveInFlightAtomIds = <String>{};
   String? _switchBlockErrorMessage;
 
   int _listRequestId = 0;
   int _detailRequestId = 0;
+  int _tagsRequestId = 0;
 
   /// Current list phase.
   NotesListPhase get listPhase => _listPhase;
@@ -155,6 +178,18 @@ class NotesController extends ChangeNotifier {
 
   /// Current list-level error message.
   String? get listErrorMessage => _listErrorMessage;
+
+  /// Whether tag catalog request is currently in flight.
+  bool get tagsLoading => _tagsLoading;
+
+  /// Normalized tags sorted alphabetically for filter UI.
+  List<String> get availableTags => List.unmodifiable(_availableTags);
+
+  /// Current tag catalog failure message.
+  String? get tagsErrorMessage => _tagsErrorMessage;
+
+  /// Currently selected single-tag filter (`null` means unfiltered).
+  String? get selectedTag => _selectedTag;
 
   /// Currently selected note atom id.
   String? get selectedAtomId => _activeNoteId;
@@ -248,103 +283,82 @@ class NotesController extends ChangeNotifier {
     return _titleFromContent(item.content);
   }
 
-  /// Loads note list and auto-selects first item when available.
+  /// Loads notes baseline and tag catalog on initial page entry.
   ///
   /// Side effects:
   /// - Resets existing tab/detail state before reloading.
-  /// - Opens first loaded note as active tab on success.
+  /// - Opens first loaded note as active tab when available.
   Future<void> loadNotes() async {
-    final requestId = ++_listRequestId;
-    _listPhase = NotesListPhase.loading;
-    _items = const [];
-    _listErrorMessage = null;
-    _selectedNote = null;
-    _detailLoading = false;
-    _detailErrorMessage = null;
-    _openNoteIds.clear();
-    _noteCache.clear();
-    _draftContentByAtomId.clear();
-    _persistedContentByAtomId.clear();
-    _draftVersionByAtomId.clear();
-    _saveFutureByAtomId.clear();
-    _saveQueuedByAtomId.clear();
-    _activeNoteId = null;
-    _activeDraftAtomId = null;
-    _activeDraftContent = '';
-    _creatingNote = false;
-    _createErrorMessage = null;
-    _autosaveTimer?.cancel();
-    _savedBadgeTimer?.cancel();
-    _noteSaveState = NoteSaveState.clean;
-    _saveErrorMessage = null;
-    _showSavedBadge = false;
-    _switchBlockErrorMessage = null;
-    notifyListeners();
-
-    try {
-      await _prepare();
-      if (requestId != _listRequestId) {
-        return;
-      }
-
-      final response = await _notesListInvoker(
-        tag: null,
-        limit: listLimit,
-        offset: 0,
-      );
-      if (requestId != _listRequestId) {
-        return;
-      }
-
-      if (!response.ok) {
-        _listPhase = NotesListPhase.error;
-        _listErrorMessage = _envelopeError(
-          errorCode: response.errorCode,
-          message: response.message,
-          fallback: 'Failed to load notes.',
-        );
-        notifyListeners();
-        return;
-      }
-
-      final loadedItems = List<rust_api.NoteItem>.unmodifiable(response.items);
-      if (loadedItems.isEmpty) {
-        _listPhase = NotesListPhase.empty;
-        _items = const [];
-        notifyListeners();
-        return;
-      }
-
-      _listPhase = NotesListPhase.success;
-      _items = loadedItems;
-      for (final item in loadedItems) {
-        _insertOrReplaceListItem(item, updatePersisted: true);
-      }
-      _activeNoteId = loadedItems.first.atomId;
-      _selectedNote = loadedItems.first;
-      _activeDraftAtomId = loadedItems.first.atomId;
-      _activeDraftContent =
-          _draftContentByAtomId[loadedItems.first.atomId] ??
-          loadedItems.first.content;
-      _openNoteIds
-        ..clear()
-        ..add(loadedItems.first.atomId);
-      _setSaveState(NoteSaveState.clean);
-      notifyListeners();
-
-      await _loadSelectedDetail(atomId: loadedItems.first.atomId);
-    } catch (error) {
-      if (requestId != _listRequestId) {
-        return;
-      }
-      _listPhase = NotesListPhase.error;
-      _listErrorMessage = 'Notes load failed unexpectedly: $error';
-      notifyListeners();
-    }
+    await _loadNotes(
+      resetSession: true,
+      preserveActiveWhenFilteredOut: false,
+      refreshTags: true,
+    );
   }
 
-  /// Retries list loading from scratch.
-  Future<void> retryLoad() => loadNotes();
+  /// Retries notes list for current filter without resetting opened tabs.
+  Future<void> retryLoad() async {
+    await _loadNotes(
+      resetSession: false,
+      preserveActiveWhenFilteredOut: false,
+      refreshTags: false,
+    );
+  }
+
+  /// Retries tag catalog request for filter UI.
+  Future<void> retryTagLoad() => _refreshAvailableTags();
+
+  /// Applies one normalized single-tag filter.
+  ///
+  /// Returns `false` when input is invalid or flush guard blocks transition.
+  Future<bool> applyTagFilter(String rawTag) async {
+    final normalized = _normalizeTag(rawTag);
+    if (normalized == null) {
+      // Why: blank filter tokens are invalid but should be ignored silently
+      // to keep UX stable when user submits whitespace accidentally.
+      return false;
+    }
+    if (_selectedTag == normalized) {
+      return true;
+    }
+
+    if (_activeNoteId != null) {
+      final flushed = await flushPendingSave();
+      if (!flushed) {
+        return false;
+      }
+    }
+
+    _selectedTag = normalized;
+    await _loadNotes(
+      resetSession: false,
+      preserveActiveWhenFilteredOut: false,
+      refreshTags: false,
+    );
+    return _listPhase != NotesListPhase.error;
+  }
+
+  /// Clears active single-tag filter and returns to full list.
+  ///
+  /// Returns `false` when flush guard blocks transition.
+  Future<bool> clearTagFilter() async {
+    if (_selectedTag == null) {
+      return true;
+    }
+    if (_activeNoteId != null) {
+      final flushed = await flushPendingSave();
+      if (!flushed) {
+        return false;
+      }
+    }
+    _selectedTag = null;
+    await _loadNotes(
+      resetSession: false,
+      preserveActiveWhenFilteredOut: false,
+      refreshTags: false,
+    );
+    return _listPhase != NotesListPhase.error;
+  }
 
   /// Handles open-note request from explorer shell.
   Future<bool> openNoteFromExplorer(String atomId) => selectNote(atomId);
@@ -363,6 +377,11 @@ class NotesController extends ChangeNotifier {
     _autosaveTimer?.cancel();
 
     while (true) {
+      if (_tagSaveInFlightAtomIds.contains(atomId)) {
+        await Future<void>.delayed(const Duration(milliseconds: 12));
+        continue;
+      }
+
       final inflight = _saveFutureByAtomId[atomId];
       if (inflight != null) {
         await inflight;
@@ -456,20 +475,36 @@ class NotesController extends ChangeNotifier {
         notifyListeners();
         return false;
       }
+      var createdNote = created;
+      if (_selectedTag case final activeTag?) {
+        final tagged = await _noteSetTagsInvoker(
+          atomId: created.atomId,
+          tags: <String>[activeTag],
+        );
+        if (tagged.ok && tagged.note != null) {
+          createdNote = tagged.note!;
+        } else {
+          _createErrorMessage = _envelopeError(
+            errorCode: tagged.errorCode,
+            message: tagged.message,
+            fallback: 'Created note but failed to apply active filter tag.',
+          );
+        }
+      }
 
       _listPhase = NotesListPhase.success;
       _insertOrReplaceListItem(
-        created,
+        createdNote,
         insertFront: true,
         updatePersisted: true,
       );
-      _activeNoteId = created.atomId;
-      _selectedNote = created;
-      _activeDraftAtomId = created.atomId;
-      _activeDraftContent = _draftContentByAtomId[created.atomId] ?? '';
+      _activeNoteId = createdNote.atomId;
+      _selectedNote = createdNote;
+      _activeDraftAtomId = createdNote.atomId;
+      _activeDraftContent = _draftContentByAtomId[createdNote.atomId] ?? '';
       _detailErrorMessage = null;
-      if (!_openNoteIds.contains(created.atomId)) {
-        _openNoteIds.add(created.atomId);
+      if (!_openNoteIds.contains(createdNote.atomId)) {
+        _openNoteIds.add(createdNote.atomId);
       }
       _creatingNote = false;
       _autosaveTimer?.cancel();
@@ -477,7 +512,8 @@ class NotesController extends ChangeNotifier {
       _requestEditorFocus();
       notifyListeners();
 
-      await _loadSelectedDetail(atomId: created.atomId);
+      await _refreshAvailableTags(showLoading: false);
+      await _loadSelectedDetail(atomId: createdNote.atomId);
       _requestEditorFocus();
       notifyListeners();
       return true;
@@ -487,6 +523,125 @@ class NotesController extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  /// Replaces the active note tag set using immediate-save semantics.
+  ///
+  /// Returns `false` when active note is missing or mutation fails.
+  Future<bool> setActiveNoteTags(List<String> rawTags) async {
+    final atomId = _activeNoteId;
+    if (atomId == null) {
+      return false;
+    }
+    final normalized = _normalizeTags(rawTags);
+    final current = _noteCache[atomId] ?? _selectedNote;
+    if (current == null) {
+      return false;
+    }
+
+    final sameTags = listEquals(current.tags, normalized);
+    if (sameTags) {
+      return true;
+    }
+
+    _tagSaveInFlightAtomIds.add(atomId);
+    _setSaveState(NoteSaveState.saving);
+    notifyListeners();
+
+    try {
+      await _prepare();
+      final response = await _noteSetTagsInvoker(
+        atomId: atomId,
+        tags: normalized,
+      );
+      if (!response.ok) {
+        _saveErrorMessage = _envelopeError(
+          errorCode: response.errorCode,
+          message: response.message,
+          fallback: 'Failed to update note tags.',
+        );
+        _setSaveState(NoteSaveState.error, preserveError: true);
+        notifyListeners();
+        return false;
+      }
+      final updated = response.note;
+      if (updated == null) {
+        _saveErrorMessage = 'Tag update succeeded without note payload.';
+        _setSaveState(NoteSaveState.error, preserveError: true);
+        notifyListeners();
+        return false;
+      }
+
+      _insertOrReplaceListItem(updated, updatePersisted: true);
+      if (_activeNoteId == atomId) {
+        _selectedNote = _noteCache[atomId];
+        _activeDraftContent = _draftContentByAtomId[atomId] ?? updated.content;
+        _switchBlockErrorMessage = null;
+        if (_isDirty(atomId)) {
+          _setSaveState(NoteSaveState.dirty);
+        } else {
+          _setSaveState(NoteSaveState.clean, showSavedBadge: true);
+        }
+      }
+      notifyListeners();
+
+      await _refreshAvailableTags(showLoading: false);
+
+      // Why: when active note no longer matches current filter, keep editor
+      // alive but refresh explorer list to avoid stale left-pane entries.
+      if (_selectedTag case final activeTag?) {
+        if (!updated.tags.contains(activeTag)) {
+          await _loadNotes(
+            resetSession: false,
+            preserveActiveWhenFilteredOut: true,
+            refreshTags: false,
+          );
+        }
+      }
+      return true;
+    } catch (error) {
+      _saveErrorMessage = 'Tag update failed unexpectedly: $error';
+      _setSaveState(NoteSaveState.error, preserveError: true);
+      notifyListeners();
+      return false;
+    } finally {
+      _tagSaveInFlightAtomIds.remove(atomId);
+    }
+  }
+
+  /// Adds one tag to active note with normalization and de-duplication.
+  Future<bool> addTagToActiveNote(String tag) async {
+    final normalized = _normalizeTag(tag);
+    if (normalized == null) {
+      return false;
+    }
+    final atomId = _activeNoteId;
+    if (atomId == null) {
+      return false;
+    }
+    final current = _noteCache[atomId] ?? _selectedNote;
+    if (current == null) {
+      return false;
+    }
+    return setActiveNoteTags(<String>[...current.tags, normalized]);
+  }
+
+  /// Removes one tag from active note with normalization.
+  Future<bool> removeTagFromActiveNote(String tag) async {
+    final normalized = _normalizeTag(tag);
+    if (normalized == null) {
+      return false;
+    }
+    final atomId = _activeNoteId;
+    if (atomId == null) {
+      return false;
+    }
+    final current = _noteCache[atomId] ?? _selectedNote;
+    if (current == null) {
+      return false;
+    }
+    final next = current.tags.where((entry) => entry != normalized).toList();
+    return setActiveNoteTags(next);
   }
 
   /// Selects one note and refreshes detail snapshot.
@@ -718,6 +873,210 @@ class NotesController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _loadNotes({
+    required bool resetSession,
+    required bool preserveActiveWhenFilteredOut,
+    required bool refreshTags,
+  }) async {
+    final requestId = ++_listRequestId;
+    if (refreshTags) {
+      unawaited(_refreshAvailableTags());
+    }
+
+    if (resetSession) {
+      _resetSessionForReload();
+    }
+
+    _listPhase = NotesListPhase.loading;
+    _items = const [];
+    _listErrorMessage = null;
+    _switchBlockErrorMessage = null;
+    notifyListeners();
+
+    try {
+      await _prepare();
+      if (requestId != _listRequestId) {
+        return;
+      }
+
+      final response = await _notesListInvoker(
+        tag: _selectedTag,
+        limit: listLimit,
+        offset: 0,
+      );
+      if (requestId != _listRequestId) {
+        return;
+      }
+
+      if (!response.ok) {
+        _listPhase = NotesListPhase.error;
+        _listErrorMessage = _envelopeError(
+          errorCode: response.errorCode,
+          message: response.message,
+          fallback: 'Failed to load notes.',
+        );
+        notifyListeners();
+        return;
+      }
+
+      final loadedItems = List<rust_api.NoteItem>.unmodifiable(response.items);
+      _items = loadedItems;
+      for (final item in loadedItems) {
+        // Why: during list fetch, `_items` already equals server-filtered
+        // results. Cache/persisted maps still need refresh, but rewriting
+        // visible list here can re-insert notes that no longer match filter.
+        _insertOrReplaceListItem(
+          item,
+          updatePersisted: true,
+          syncVisibleList: false,
+        );
+      }
+      _listPhase = loadedItems.isEmpty
+          ? NotesListPhase.empty
+          : NotesListPhase.success;
+
+      String? detailTargetId;
+      final activeId = _activeNoteId;
+      final activeInList =
+          activeId != null && _findLoadedItem(loadedItems, activeId) != null;
+      if (activeId == null) {
+        if (loadedItems.isNotEmpty) {
+          final first = loadedItems.first;
+          _activeNoteId = first.atomId;
+          _selectedNote = first;
+          _activeDraftAtomId = first.atomId;
+          _activeDraftContent =
+              _draftContentByAtomId[first.atomId] ?? first.content;
+          if (!_openNoteIds.contains(first.atomId)) {
+            _openNoteIds.add(first.atomId);
+          }
+          _setSaveState(NoteSaveState.clean);
+          detailTargetId = first.atomId;
+        } else {
+          _selectedNote = null;
+          _detailLoading = false;
+          _detailErrorMessage = null;
+          _activeDraftAtomId = null;
+          _activeDraftContent = '';
+          _setSaveState(NoteSaveState.clean);
+        }
+      } else if (activeInList) {
+        _selectedNote = _findLoadedItem(loadedItems, activeId) ?? _selectedNote;
+        _activeDraftAtomId = activeId;
+        _activeDraftContent =
+            _draftContentByAtomId[activeId] ?? _selectedNote?.content ?? '';
+        _refreshSaveStateForActive();
+      } else if (preserveActiveWhenFilteredOut) {
+        _selectedNote = _noteCache[activeId] ?? _selectedNote;
+        _activeDraftAtomId = activeId;
+        _activeDraftContent =
+            _draftContentByAtomId[activeId] ?? _selectedNote?.content ?? '';
+        _refreshSaveStateForActive();
+      } else if (loadedItems.isNotEmpty) {
+        final fallback = loadedItems.first;
+        _activeNoteId = fallback.atomId;
+        _selectedNote = fallback;
+        _activeDraftAtomId = fallback.atomId;
+        _activeDraftContent =
+            _draftContentByAtomId[fallback.atomId] ?? fallback.content;
+        if (!_openNoteIds.contains(fallback.atomId)) {
+          _openNoteIds.add(fallback.atomId);
+        }
+        _refreshSaveStateForActive();
+        _requestEditorFocus();
+        detailTargetId = fallback.atomId;
+      } else {
+        _activeNoteId = null;
+        _selectedNote = null;
+        _detailLoading = false;
+        _detailErrorMessage = null;
+        _activeDraftAtomId = null;
+        _activeDraftContent = '';
+        _setSaveState(NoteSaveState.clean);
+      }
+      notifyListeners();
+
+      if (detailTargetId != null) {
+        await _loadSelectedDetail(atomId: detailTargetId);
+      }
+    } catch (error) {
+      if (requestId != _listRequestId) {
+        return;
+      }
+      _listPhase = NotesListPhase.error;
+      _listErrorMessage = 'Notes load failed unexpectedly: $error';
+      notifyListeners();
+    }
+  }
+
+  void _resetSessionForReload() {
+    _selectedNote = null;
+    _detailLoading = false;
+    _detailErrorMessage = null;
+    _openNoteIds.clear();
+    _noteCache.clear();
+    _draftContentByAtomId.clear();
+    _persistedContentByAtomId.clear();
+    _draftVersionByAtomId.clear();
+    _saveFutureByAtomId.clear();
+    _saveQueuedByAtomId.clear();
+    _tagSaveInFlightAtomIds.clear();
+    _activeNoteId = null;
+    _activeDraftAtomId = null;
+    _activeDraftContent = '';
+    _creatingNote = false;
+    _createErrorMessage = null;
+    _autosaveTimer?.cancel();
+    _savedBadgeTimer?.cancel();
+    _noteSaveState = NoteSaveState.clean;
+    _saveErrorMessage = null;
+    _showSavedBadge = false;
+  }
+
+  Future<void> _refreshAvailableTags({bool showLoading = true}) async {
+    final requestId = ++_tagsRequestId;
+    if (showLoading) {
+      _tagsLoading = true;
+      _tagsErrorMessage = null;
+      notifyListeners();
+    }
+
+    try {
+      await _prepare();
+      if (requestId != _tagsRequestId) {
+        return;
+      }
+
+      final response = await _tagsListInvoker();
+      if (requestId != _tagsRequestId) {
+        return;
+      }
+
+      if (!response.ok) {
+        _tagsLoading = false;
+        _tagsErrorMessage = _envelopeError(
+          errorCode: response.errorCode,
+          message: response.message,
+          fallback: 'Failed to load tags.',
+        );
+        notifyListeners();
+        return;
+      }
+
+      _availableTags = List<String>.unmodifiable(_normalizeTags(response.tags));
+      _tagsLoading = false;
+      _tagsErrorMessage = null;
+      notifyListeners();
+    } catch (error) {
+      if (requestId != _tagsRequestId) {
+        return;
+      }
+      _tagsLoading = false;
+      _tagsErrorMessage = 'Tags load failed unexpectedly: $error';
+      notifyListeners();
+    }
+  }
+
   /// Retries loading current selected note detail.
   Future<void> refreshSelectedDetail() async {
     final atomId = _activeNoteId;
@@ -782,6 +1141,18 @@ class NotesController extends ChangeNotifier {
     }
   }
 
+  rust_api.NoteItem? _findLoadedItem(
+    List<rust_api.NoteItem> items,
+    String atomId,
+  ) {
+    for (final item in items) {
+      if (item.atomId == atomId) {
+        return item;
+      }
+    }
+    return null;
+  }
+
   rust_api.NoteItem? _findListItem(String atomId) {
     for (final item in _items) {
       if (item.atomId == atomId) {
@@ -795,6 +1166,7 @@ class NotesController extends ChangeNotifier {
     rust_api.NoteItem note, {
     bool insertFront = false,
     bool updatePersisted = false,
+    bool syncVisibleList = true,
   }) {
     final wasDirty = _isDirty(note.atomId);
     _noteCache[note.atomId] = note;
@@ -805,16 +1177,25 @@ class NotesController extends ChangeNotifier {
         _draftContentByAtomId[note.atomId] = note.content;
       }
     }
+    if (!syncVisibleList) {
+      return;
+    }
+
+    final includeInVisibleList = _shouldIncludeInVisibleList(note);
     final mutable = List<rust_api.NoteItem>.from(_items);
     final existingIndex = mutable.indexWhere(
       (item) => item.atomId == note.atomId,
     );
-    if (existingIndex >= 0) {
-      mutable[existingIndex] = note;
-    } else if (insertFront) {
-      mutable.insert(0, note);
-    } else {
-      mutable.add(note);
+    if (includeInVisibleList) {
+      if (existingIndex >= 0) {
+        mutable[existingIndex] = note;
+      } else if (insertFront) {
+        mutable.insert(0, note);
+      } else {
+        mutable.add(note);
+      }
+    } else if (existingIndex >= 0) {
+      mutable.removeAt(existingIndex);
     }
     _items = List<rust_api.NoteItem>.unmodifiable(mutable);
   }
@@ -844,7 +1225,17 @@ class NotesController extends ChangeNotifier {
   }
 
   bool _hasPendingSaveFor(String atomId) {
-    return _isDirty(atomId) || _saveFutureByAtomId.containsKey(atomId);
+    return _isDirty(atomId) ||
+        _saveFutureByAtomId.containsKey(atomId) ||
+        _tagSaveInFlightAtomIds.contains(atomId);
+  }
+
+  bool _shouldIncludeInVisibleList(rust_api.NoteItem note) {
+    final selectedTag = _selectedTag;
+    if (selectedTag == null) {
+      return true;
+    }
+    return note.tags.contains(selectedTag);
   }
 
   void _scheduleAutosave({required String atomId, required int version}) {
@@ -1018,6 +1409,25 @@ class NotesController extends ChangeNotifier {
     return '[$errorCode] $normalized';
   }
 
+  String? _normalizeTag(String raw) {
+    final normalized = raw.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
+  }
+
+  List<String> _normalizeTags(List<String> rawTags) {
+    final set = SplayTreeSet<String>();
+    for (final tag in rawTags) {
+      final normalized = _normalizeTag(tag);
+      if (normalized != null) {
+        set.add(normalized);
+      }
+    }
+    return List<String>.unmodifiable(set);
+  }
+
   String _titleFromContent(String content) {
     final lines = content.split(RegExp(r'\r?\n'));
     for (final line in lines) {
@@ -1055,6 +1465,17 @@ Future<rust_api.NoteResponse> _defaultNoteUpdateInvoker({
   required String content,
 }) {
   return rust_api.noteUpdate(atomId: atomId, content: content);
+}
+
+Future<rust_api.TagsListResponse> _defaultTagsListInvoker() {
+  return rust_api.tagsList();
+}
+
+Future<rust_api.NoteResponse> _defaultNoteSetTagsInvoker({
+  required String atomId,
+  required List<String> tags,
+}) {
+  return rust_api.noteSetTags(atomId: atomId, tags: tags);
 }
 
 Future<void> _defaultPrepare() async {

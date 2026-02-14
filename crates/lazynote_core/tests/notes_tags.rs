@@ -190,6 +190,26 @@ fn set_note_tags_refreshes_note_updated_at() {
 }
 
 #[test]
+fn unused_tags_are_pruned_after_full_replacement() {
+    let mut conn = open_db_in_memory().unwrap();
+    let repo = SqliteNoteRepository::try_new(&mut conn).unwrap();
+    let mut service = NoteService::new(repo);
+    let created = service.create_note("tag lifecycle").unwrap();
+
+    let tagged = service
+        .set_note_tags(created.atom_id, vec!["ephemeral".to_string()])
+        .unwrap();
+    assert_eq!(tagged.tags, vec!["ephemeral".to_string()]);
+    let before_clear = service.list_tags().unwrap();
+    assert!(before_clear.contains(&"ephemeral".to_string()));
+
+    let cleared = service.set_note_tags(created.atom_id, Vec::new()).unwrap();
+    assert!(cleared.tags.is_empty());
+    let after_clear = service.list_tags().unwrap();
+    assert!(!after_clear.contains(&"ephemeral".to_string()));
+}
+
+#[test]
 fn note_repository_rejects_connection_missing_tags_table() {
     let mut conn = Connection::open_in_memory().unwrap();
     create_minimal_atoms_table(&conn);

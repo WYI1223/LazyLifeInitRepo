@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
 import 'package:lazynote_flutter/features/notes/notes_controller.dart';
 import 'package:lazynote_flutter/features/notes/notes_style.dart';
+import 'package:lazynote_flutter/features/tags/tag_filter.dart';
 
 /// Folder node model reserved for hierarchical explorer expansion.
 class ExplorerFolderNode {
@@ -150,6 +153,27 @@ class _NoteExplorerState extends State<NoteExplorer> {
                 },
               ),
             ),
+          ),
+          const Divider(
+            height: 1,
+            indent: 12,
+            endIndent: 12,
+            color: kNotesDividerColor,
+          ),
+          TagFilter(
+            loading: widget.controller.tagsLoading,
+            tags: widget.controller.availableTags,
+            selectedTag: widget.controller.selectedTag,
+            errorMessage: widget.controller.tagsErrorMessage,
+            onSelectTag: (tag) {
+              unawaited(widget.controller.applyTagFilter(tag));
+            },
+            onClearTag: () {
+              unawaited(widget.controller.clearTagFilter());
+            },
+            onRetry: () {
+              unawaited(widget.controller.retryTagLoad());
+            },
           ),
           const Divider(
             height: 1,

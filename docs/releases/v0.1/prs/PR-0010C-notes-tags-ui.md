@@ -1,7 +1,7 @@
 # PR-0010C-notes-tags-ui
 
 - Proposed title: `feat(notes-ui): notes list/editor and tag filter integration`
-- Status: In Progress (C1/C2/C3 done; C4 pending)
+- Status: Implemented (C1/C2/C3/C4 done)
 
 ## Goal
 
@@ -154,6 +154,33 @@ This PR line follows `docs/architecture/code-comment-standards.md`:
    - wide and narrow now share dropdown-based `...` interaction contract
    - final behavior validated in manual narrow/window resize runs
 
+## C4 Integration Closure Sync
+
+1. Explorer header now hosts reusable single-tag filter UI.
+2. Tag catalog wiring landed:
+   - `tags_list` load state + retry path
+   - alphabetical tag ordering for deterministic chip layout
+3. Notes list filter wiring landed:
+   - `notes_list(tag)` apply path
+   - clear action returns unfiltered list
+4. Contextual create under active filter landed:
+   - create note auto-applies current selected tag (`note_set_tags`)
+5. Immediate tag mutation path landed:
+   - active note tag add/remove writes through `note_set_tags` immediately
+6. Ghost-state contract landed:
+   - when active note leaves current filter due to tag edit, left list updates
+   - right editor remains open on active note
+7. Added C4 widget regression suite:
+   - filter apply/clear
+   - contextual create auto-tag
+   - ghost-state behavior
+   - filter error and recovery paths
+8. C4 post-review fixes:
+   - removed dedicated `Clear` button in filter area; selected chip now toggles clear
+   - fixed filtered-list pollution when activating a non-matching open tab
+   - aligned tag lifecycle with active-note references by pruning orphan tags in core
+   - added filter overflow interaction (`+N more` expand / collapse) for large tag sets
+
 ## Execution Specs (Split Files)
 
 1. `PR-0010C1`: `docs/releases/v0.1/prs/PR-0010C1-notes-host-list-baseline.md`
@@ -195,7 +222,7 @@ This PR line follows `docs/architecture/code-comment-standards.md`:
 
 ## Acceptance Criteria
 
-- [ ] Notes placeholder is replaced by functional notes list/editor UI.
-- [ ] Single-tag filter works and can be cleared.
-- [ ] Save path updates UI state consistently.
-- [ ] Flutter tests cover primary and failure flows.
+- [x] Notes placeholder is replaced by functional notes list/editor UI.
+- [x] Single-tag filter works and can be cleared.
+- [x] Save path updates UI state consistently.
+- [x] Flutter tests cover primary and failure flows.

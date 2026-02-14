@@ -243,6 +243,14 @@ impl NoteRepository for SqliteNoteRepository<'_> {
         }
 
         tx.execute(
+            // Why: v0.1 filter chips should represent tags that still have at
+            // least one note reference; prune detached dictionary rows here.
+            "DELETE FROM tags
+             WHERE id NOT IN (SELECT DISTINCT tag_id FROM atom_tags);",
+            [],
+        )?;
+
+        tx.execute(
             "UPDATE atoms
              SET updated_at = (strftime('%s', 'now') * 1000)
              WHERE uuid = ?1
