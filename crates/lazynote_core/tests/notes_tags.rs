@@ -1,8 +1,11 @@
+use lazynote_core::db::migrations::latest_version;
 use lazynote_core::db::open_db_in_memory;
 use lazynote_core::{
-    AtomService, NoteService, NoteServiceError, SqliteAtomRepository, SqliteNoteRepository,
+    AtomService, NoteService, NoteServiceError, RepoError, SqliteAtomRepository,
+    SqliteNoteRepository,
 };
 use rusqlite::params;
+use rusqlite::Connection;
 
 #[test]
 fn create_and_update_note_derives_markdown_preview_fields() {
@@ -184,4 +187,60 @@ fn set_note_tags_refreshes_note_updated_at() {
         .set_note_tags(created_id, vec!["work".to_string()])
         .unwrap();
     assert!(updated.updated_at > 1000);
+}
+
+#[test]
+fn note_repository_rejects_connection_missing_tags_table() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    create_minimal_atoms_table(&conn);
+    conn.execute_batch(&format!("PRAGMA user_version = {};", latest_version()))
+        .unwrap();
+
+    let result = SqliteNoteRepository::try_new(&mut conn);
+    assert!(matches!(
+        result,
+        Err(RepoError::MissingRequiredTable("tags"))
+    ));
+}
+
+#[test]
+fn note_repository_rejects_connection_missing_atom_tags_column() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    create_minimal_atoms_table(&conn);
+    conn.execute_batch(
+        "CREATE TABLE tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL
+        );
+        CREATE TABLE atom_tags (
+            atom_uuid TEXT NOT NULL
+        );",
+    )
+    .unwrap();
+    conn.execute_batch(&format!("PRAGMA user_version = {};", latest_version()))
+        .unwrap();
+
+    let result = SqliteNoteRepository::try_new(&mut conn);
+    assert!(matches!(
+        result,
+        Err(RepoError::MissingRequiredColumn {
+            table: "atom_tags",
+            column: "tag_id"
+        })
+    ));
+}
+
+fn create_minimal_atoms_table(conn: &Connection) {
+    conn.execute_batch(
+        "CREATE TABLE atoms (
+            uuid TEXT PRIMARY KEY NOT NULL,
+            type TEXT NOT NULL,
+            content TEXT NOT NULL,
+            preview_text TEXT NULL,
+            preview_image TEXT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now') * 1000)
+        );",
+    )
+    .unwrap();
 }

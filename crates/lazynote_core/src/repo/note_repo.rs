@@ -81,6 +81,7 @@ impl<'conn> SqliteNoteRepository<'conn> {
     /// Constructs a repository from a migrated/ready connection.
     pub fn try_new(conn: &'conn mut Connection) -> RepoResult<Self> {
         let _ = SqliteAtomRepository::try_new(conn)?;
+        ensure_note_connection_ready(conn)?;
         Ok(Self { conn })
     }
 }
@@ -334,4 +335,57 @@ fn note_exists_in_tx(tx: &Transaction<'_>, atom_uuid: &str) -> RepoResult<bool> 
         |row| row.get(0),
     )?;
     Ok(exists == 1)
+}
+
+fn ensure_note_connection_ready(conn: &Connection) -> RepoResult<()> {
+    for table in ["tags", "atom_tags"] {
+        if !table_exists(conn, table)? {
+            return Err(RepoError::MissingRequiredTable(table));
+        }
+    }
+
+    for column in ["id", "name"] {
+        if !table_has_column(conn, "tags", column)? {
+            return Err(RepoError::MissingRequiredColumn {
+                table: "tags",
+                column,
+            });
+        }
+    }
+
+    for column in ["atom_uuid", "tag_id"] {
+        if !table_has_column(conn, "atom_tags", column)? {
+            return Err(RepoError::MissingRequiredColumn {
+                table: "atom_tags",
+                column,
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn table_exists(conn: &Connection, table: &str) -> RepoResult<bool> {
+    let exists: i64 = conn.query_row(
+        "SELECT EXISTS(
+            SELECT 1
+            FROM sqlite_master
+            WHERE type = 'table' AND name = ?1
+        );",
+        [table],
+        |row| row.get(0),
+    )?;
+    Ok(exists == 1)
+}
+
+fn table_has_column(conn: &Connection, table: &str, column: &str) -> RepoResult<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({table});"))?;
+    let mut rows = stmt.query([])?;
+    while let Some(row) = rows.next()? {
+        let current: String = row.get(1)?;
+        if current == column {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
