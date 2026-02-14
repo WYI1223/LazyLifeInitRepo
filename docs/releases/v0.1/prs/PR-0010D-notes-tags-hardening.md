@@ -1,7 +1,7 @@
 # PR-0010D-notes-tags-hardening
 
 - Proposed title: `chore(notes): hardening, regression tests, docs closure`
-- Status: Planned
+- Status: In Progress
 
 ## Goal
 
@@ -34,11 +34,9 @@ Out of scope:
    - step 1: `note_create`
    - step 2: `note_set_tags`
    If step 1 succeeds but step 2 fails, backend already contains the new note.
-   Current v0.1 behavior is fail-fast on UI (`createNote()` returns `false` and
-   Explorer shows create error), but this is not an atomic transaction.
-2. Concurrency coverage still has one deferred gap:
-   - explicit regression case for "manual Reload while per-note tag mutation
-     queue is active" is not added yet.
+   Current v0.1 behavior keeps the create success path and shows a warning
+   (`SnackBar`): note is visible in unfiltered list but not in current filtered
+   list when tag apply fails.
 
 ## Explicit v0.1 Non-goal Addendum
 
@@ -62,6 +60,20 @@ Out of scope:
    - `docs/releases/v0.1/README.md`
    - `docs/api/*` and `docs/governance/API_COMPATIBILITY.md` (if contract changed)
 5. Run full quality gates and mark PR-0010 complete.
+
+## Landed in D1-D2
+
+1. Tag mutation ordering hardening:
+   - serialized per-note tag writes in controller queue
+   - guarded manual reload paths (`loadNotes` / `retryLoad`) to await pending tag writes
+2. Filter safety hardening:
+   - auto-clear stale selected filter when selected tag disappears from available tags
+3. Contextual create failure UX hardening:
+   - non-transactional create+tag behavior explicitly surfaced as warning instead of silent mismatch
+4. Regression tests added:
+   - orphan note recovery visibility after clearing filter
+   - manual reload vs tag-write queue concurrency
+   - retry reload vs tag-write queue concurrency
 
 ## Planned File Changes
 

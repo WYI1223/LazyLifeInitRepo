@@ -73,10 +73,8 @@ Out of scope:
 1. Contextual create under active filter is currently non-transactional:
    - implementation uses `note_create` then `note_set_tags`
    - if `note_set_tags` fails after create succeeds, new note already exists in backend
-   - UI returns create failure and shows explicit create error message
-2. Deferred regression case:
-   - add explicit test for "manual reload while tag mutation queue is active"
-3. Note delete is out of scope for C4/v0.1:
+   - UI keeps create success path and shows warning message
+2. Note delete is out of scope for C4/v0.1:
    - no delete affordance is shipped in current Notes UI
 
 ## Step-by-Step

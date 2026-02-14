@@ -59,10 +59,10 @@ PR-0010C is executed internally as 4 delivery slices:
 - `PR-0010A`: completed
 - `PR-0010B`: completed
 - `PR-0010C1`: completed
-- `PR-0010C2`: next
-- `PR-0010C3`: pending
-- `PR-0010C4`: pending
-- `PR-0010D`: pending
+- `PR-0010C2`: completed
+- `PR-0010C3`: completed
+- `PR-0010C4`: completed
+- `PR-0010D`: in progress (hardening + docs closure)
 
 ## Phase Summary (B/C/D)
 

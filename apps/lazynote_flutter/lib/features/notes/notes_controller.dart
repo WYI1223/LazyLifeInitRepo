@@ -144,6 +144,7 @@ class NotesController extends ChangeNotifier {
   String? _detailErrorMessage;
   bool _creatingNote = false;
   String? _createErrorMessage;
+  String? _createWarningMessage;
 
   final List<String> _openNoteIds = <String>[];
   final Map<String, rust_api.NoteItem> _noteCache =
@@ -216,6 +217,16 @@ class NotesController extends ChangeNotifier {
 
   /// Current create-note failure message.
   String? get createErrorMessage => _createErrorMessage;
+
+  /// Non-fatal create warning (e.g. contextual tag apply failed).
+  String? get createWarningMessage => _createWarningMessage;
+
+  /// Returns and clears the latest non-fatal create warning.
+  String? takeCreateWarningMessage() {
+    final warning = _createWarningMessage;
+    _createWarningMessage = null;
+    return warning;
+  }
 
   /// Save lifecycle state for active note.
   NoteSaveState get noteSaveState => _noteSaveState;
@@ -291,6 +302,7 @@ class NotesController extends ChangeNotifier {
   /// - Resets existing tab/detail state before reloading.
   /// - Opens first loaded note as active tab when available.
   Future<void> loadNotes() async {
+    await _awaitPendingTagMutations();
     await _loadNotes(
       resetSession: true,
       preserveActiveWhenFilteredOut: false,
@@ -300,6 +312,7 @@ class NotesController extends ChangeNotifier {
 
   /// Retries notes list for current filter without resetting opened tabs.
   Future<void> retryLoad() async {
+    await _awaitPendingTagMutations();
     await _loadNotes(
       resetSession: false,
       preserveActiveWhenFilteredOut: false,
@@ -459,6 +472,7 @@ class NotesController extends ChangeNotifier {
     }
     _creatingNote = true;
     _createErrorMessage = null;
+    _createWarningMessage = null;
     notifyListeners();
 
     try {
@@ -492,14 +506,8 @@ class NotesController extends ChangeNotifier {
         if (tagged.ok && tagged.note != null) {
           createdNote = tagged.note!;
         } else {
-          _creatingNote = false;
-          _createErrorMessage = _envelopeError(
-            errorCode: tagged.errorCode,
-            message: tagged.message,
-            fallback: 'Created note but failed to apply active filter tag.',
-          );
-          notifyListeners();
-          return false;
+          _createWarningMessage =
+              'Note created, but applying active filter tag failed. Check All Notes.';
         }
       }
 
@@ -634,6 +642,20 @@ class NotesController extends ChangeNotifier {
         });
     _tagMutationQueueByAtomId[atomId] = queued;
     return completer.future;
+  }
+
+  Future<void> _awaitPendingTagMutations() async {
+    while (true) {
+      final snapshot = _tagMutationQueueByAtomId.values.toList();
+      if (snapshot.isEmpty) {
+        if (_tagSaveInFlightAtomIds.isEmpty) {
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 12));
+        continue;
+      }
+      await Future.wait(snapshot.map((future) => future.catchError((_) {})));
+    }
   }
 
   Future<bool> _setNoteTags({
@@ -1096,6 +1118,7 @@ class NotesController extends ChangeNotifier {
     _activeDraftContent = '';
     _creatingNote = false;
     _createErrorMessage = null;
+    _createWarningMessage = null;
     _autosaveTimer?.cancel();
     _savedBadgeTimer?.cancel();
     _noteSaveState = NoteSaveState.clean;

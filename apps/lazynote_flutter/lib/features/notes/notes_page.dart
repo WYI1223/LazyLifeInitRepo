@@ -343,6 +343,23 @@ class _NotesPageState extends State<NotesPage>
                                     _controller.openNoteFromExplorer,
                                 onCreateNoteRequested: () async {
                                   await _controller.createNote();
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  final warning = _controller
+                                      .takeCreateWarningMessage();
+                                  if (warning == null) {
+                                    return;
+                                  }
+                                  ScaffoldMessenger.maybeOf(context)
+                                    ?..hideCurrentSnackBar()
+                                    ..showSnackBar(
+                                      SnackBar(
+                                        content: Text(warning),
+                                        behavior: SnackBarBehavior.floating,
+                                        duration: const Duration(seconds: 4),
+                                      ),
+                                    );
                                 },
                               ),
                             ),
