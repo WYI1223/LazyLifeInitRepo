@@ -1,6 +1,10 @@
 # FFI Contract (v0.1)
 
-This document defines the Flutter-to-Rust FFI contract for v0.1.
+This document defines the Flutter-to-Rust Single Entry FFI contract for v0.1.
+
+For notes/tags contracts added in PR-0010B, see:
+
+- `docs/api/ffi-contracts.md`
 
 ## Conventions
 

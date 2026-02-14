@@ -26,6 +26,8 @@ const ATOM_SELECT_SQL: &str = "SELECT
     uuid,
     type,
     content,
+    preview_text,
+    preview_image,
     task_status,
     event_start,
     event_end,
@@ -190,16 +192,20 @@ impl AtomRepository for SqliteAtomRepository<'_> {
                 uuid,
                 type,
                 content,
+                preview_text,
+                preview_image,
                 task_status,
                 event_start,
                 event_end,
                 hlc_timestamp,
                 is_deleted
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8);",
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10);",
             params![
                 atom.uuid.to_string(),
                 atom_type_to_db(atom.kind),
                 atom.content.as_str(),
+                atom.preview_text.as_deref(),
+                atom.preview_image.as_deref(),
                 atom.task_status.map(task_status_to_db),
                 atom.event_start,
                 atom.event_end,
@@ -244,16 +250,20 @@ impl AtomRepository for SqliteAtomRepository<'_> {
              SET
                 type = ?1,
                 content = ?2,
-                task_status = ?3,
-                event_start = ?4,
-                event_end = ?5,
-                hlc_timestamp = ?6,
-                is_deleted = ?7,
+                preview_text = ?3,
+                preview_image = ?4,
+                task_status = ?5,
+                event_start = ?6,
+                event_end = ?7,
+                hlc_timestamp = ?8,
+                is_deleted = ?9,
                 updated_at = (strftime('%s', 'now') * 1000)
-             WHERE uuid = ?8;",
+             WHERE uuid = ?10;",
             params![
                 atom_type_to_db(atom.kind),
                 atom.content.as_str(),
+                atom.preview_text.as_deref(),
+                atom.preview_image.as_deref(),
                 atom.task_status.map(task_status_to_db),
                 atom.event_start,
                 atom.event_end,
@@ -432,6 +442,8 @@ fn parse_atom_row(row: &Row<'_>) -> RepoResult<Atom> {
         uuid,
         kind,
         content: row.get("content")?,
+        preview_text: row.get("preview_text")?,
+        preview_image: row.get("preview_image")?,
         task_status,
         event_start: row.get("event_start")?,
         event_end: row.get("event_end")?,
@@ -511,7 +523,15 @@ fn ensure_connection_ready(conn: &Connection) -> RepoResult<()> {
         return Err(RepoError::MissingRequiredTable("atoms"));
     }
 
-    for column in ["uuid", "type", "content", "is_deleted", "updated_at"] {
+    for column in [
+        "uuid",
+        "type",
+        "content",
+        "preview_text",
+        "preview_image",
+        "is_deleted",
+        "updated_at",
+    ] {
         if !table_has_column(conn, "atoms", column)? {
             return Err(RepoError::MissingRequiredColumn {
                 table: "atoms",

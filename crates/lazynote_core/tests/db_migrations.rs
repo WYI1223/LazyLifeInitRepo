@@ -12,6 +12,8 @@ fn open_db_in_memory_applies_all_migrations() {
     assert_table_exists(&conn, "tags");
     assert_table_exists(&conn, "atom_tags");
     assert_table_exists(&conn, "external_mappings");
+    assert_column_exists(&conn, "atoms", "preview_text");
+    assert_column_exists(&conn, "atoms", "preview_image");
 }
 
 #[test]
@@ -169,4 +171,18 @@ fn assert_table_exists(conn: &Connection, table_name: &str) {
         )
         .unwrap();
     assert_eq!(exists, 1, "table {table_name} does not exist");
+}
+
+fn assert_column_exists(conn: &Connection, table_name: &str, column_name: &str) {
+    let mut stmt = conn
+        .prepare(&format!("PRAGMA table_info({table_name});"))
+        .unwrap();
+    let mut rows = stmt.query([]).unwrap();
+    while let Some(row) = rows.next().unwrap() {
+        let current: String = row.get(1).unwrap();
+        if current == column_name {
+            return;
+        }
+    }
+    panic!("column {column_name} does not exist in table {table_name}");
 }

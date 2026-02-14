@@ -13,3 +13,4 @@
 //! - docs/releases/v0.1/prs/PR-0006-core-crud.md
 
 pub mod atom_repo;
+pub mod note_repo;

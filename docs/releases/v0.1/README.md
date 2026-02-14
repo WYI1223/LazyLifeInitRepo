@@ -58,8 +58,10 @@ See `docs/releases/v0.1/prs/`.
 - Completed: `PR-0009B` entry parser/state + Workbench-integrated Single Entry panel
 - Completed: `PR-0009C` realtime search flow (`onChanged` search + result list rendering + stale-response guard + startup DB-path readiness hardening)
 - Completed: `PR-0009D` command execution flow (`new note/task/schedule`)
+- Completed: `PR-0010A` unified Single Entry panel UI shell
+- Completed: `PR-0010B` notes/tags core + FFI contracts (including markdown preview hook)
 - Completed: `PR-0018` API contract docs guard (CI gate for contract/doc sync)
-- Next: `PR-0010A` single entry unified panel UI shell
+- Next: `PR-0010C` notes/tags Flutter UI integration
 
 Execution note:
 

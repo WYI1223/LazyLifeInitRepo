@@ -72,6 +72,15 @@ pub struct Atom {
     pub kind: AtomType,
     /// Markdown body (or plain text fallback for simple inputs).
     pub content: String,
+    /// Derived plain-text summary from markdown content.
+    ///
+    /// This field is a projection cache and not the source of truth. The
+    /// source remains `content`.
+    pub preview_text: Option<String>,
+    /// Derived first markdown image path used by list preview UIs.
+    ///
+    /// This field is a projection cache and not the source of truth.
+    pub preview_image: Option<String>,
     /// Meaningful only when `kind == AtomType::Task`.
     pub task_status: Option<TaskStatus>,
     /// Unix epoch milliseconds. Meaningful for event-like atoms.
@@ -112,6 +121,8 @@ struct AtomDe {
     #[serde(rename = "type")]
     kind: AtomType,
     content: String,
+    preview_text: Option<String>,
+    preview_image: Option<String>,
     task_status: Option<TaskStatus>,
     event_start: Option<i64>,
     event_end: Option<i64>,
@@ -127,6 +138,8 @@ impl TryFrom<AtomDe> for Atom {
             uuid: value.uuid,
             kind: value.kind,
             content: value.content,
+            preview_text: value.preview_text,
+            preview_image: value.preview_image,
             task_status: value.task_status,
             event_start: value.event_start,
             event_end: value.event_end,
@@ -149,6 +162,8 @@ impl Atom {
             uuid: Uuid::new_v4(),
             kind,
             content: content.into(),
+            preview_text: None,
+            preview_image: None,
             task_status: None,
             event_start: None,
             event_end: None,
@@ -183,6 +198,8 @@ impl Atom {
             uuid,
             kind,
             content: content.into(),
+            preview_text: None,
+            preview_image: None,
             task_status: None,
             event_start: None,
             event_end: None,

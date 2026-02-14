@@ -22,10 +22,19 @@ pub use model::atom::{Atom, AtomId, AtomType, AtomValidationError, TaskStatus};
 pub use repo::atom_repo::{
     AtomListQuery, AtomRepository, RepoError, RepoResult, SqliteAtomRepository,
 };
+/// Re-export notes/tags repository models and implementation.
+pub use repo::note_repo::{
+    normalize_note_limit, normalize_tag, normalize_tags, NoteListQuery, NoteRecord, NoteRepository,
+    SqliteNoteRepository,
+};
 /// Re-export search query/result models and search entry point.
 pub use search::fts::{search_all, SearchError, SearchHit, SearchQuery, SearchResult};
 /// Re-export atom service facade.
 pub use service::atom_service::{AtomService, ScheduleEventRequest};
+/// Re-export notes service facade and models.
+pub use service::note_service::{
+    derive_markdown_preview, MarkdownPreview, NoteService, NoteServiceError, NotesListResult,
+};
 
 /// Minimal health-check API for early integration.
 pub fn ping() -> &'static str {

@@ -8,3 +8,4 @@
 //! - docs/releases/v0.1/prs/PR-0006-core-crud.md
 
 pub mod atom_service;
+pub mod note_service;

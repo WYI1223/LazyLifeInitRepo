@@ -31,10 +31,65 @@ PR-0010 is executed as 4 smaller PRs:
 - `PR-0010A`: Single Entry unified floating panel UI shell
   - spec: `docs/releases/v0.1/prs/PR-0010A-entry-unified-panel.md`
 - `PR-0010B`: notes/tags core + FFI contracts
+  - spec: `docs/releases/v0.1/prs/PR-0010B-notes-tags-core-ffi.md`
 - `PR-0010C`: notes/tags Flutter UI integration
+  - spec: `docs/releases/v0.1/prs/PR-0010C-notes-tags-ui.md`
 - `PR-0010D`: hardening, regression tests, docs closure
+  - spec: `docs/releases/v0.1/prs/PR-0010D-notes-tags-hardening.md`
 
-## Step-by-Step
+## Current State
+
+- `PR-0010A`: completed
+- `PR-0010B`: completed
+- `PR-0010C`: next
+- `PR-0010D`: pending
+
+## Phase Summary (B/C/D)
+
+### PR-0010B (Core + FFI)
+
+Purpose:
+
+- establish note/tag domain contracts and typed FFI envelopes
+
+Expected effect:
+
+- Flutter can call stable notes/tags APIs without parsing free-text error messages
+
+Pre-landing checks:
+
+- API contract agreed in docs
+- core invariants and error mapping clarified
+
+### PR-0010C (Flutter UI)
+
+Purpose:
+
+- replace Notes placeholder with usable list/editor/filter flow
+
+Expected effect:
+
+- user can create/edit notes and filter list by one tag in Workbench Notes section
+
+Pre-landing checks:
+
+- PR-0010B APIs stable and generated bindings refreshed
+
+### PR-0010D (Hardening + Closure)
+
+Purpose:
+
+- close async/race/error risks and complete docs/test closure
+
+Expected effect:
+
+- note/tag flow is stable under overlap/failure/retry scenarios and release docs are synced
+
+Pre-landing checks:
+
+- B/C baseline features pass end-to-end
+
+## Execution Order
 
 1. Land `PR-0010A` (Single Entry UI shell behavior/appearance lock).
 2. Land `PR-0010B` (core + FFI APIs for notes/tags).

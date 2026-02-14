@@ -10,6 +10,7 @@ This directory contains the API contracts for LazyNote runtime boundaries.
 
 ## Document Index
 
+- `docs/api/ffi-contracts.md`: consolidated FFI contract index (including notes/tags)
 - `docs/api/ffi-contract-v0.1.md`: FFI function contracts for v0.1
 - `docs/api/error-codes.md`: stable error codes and handling rules
 - `docs/api/single-entry-contract.md`: Single Entry behavior contract

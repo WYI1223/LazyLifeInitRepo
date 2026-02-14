@@ -10,6 +10,7 @@
 
 use crate::model::atom::{Atom, AtomId, AtomType, TaskStatus};
 use crate::repo::atom_repo::{AtomListQuery, AtomRepository, RepoResult};
+use crate::service::note_service::derive_markdown_preview;
 
 /// Use-case service wrapper for atom CRUD operations.
 pub struct AtomService<R: AtomRepository> {
@@ -44,7 +45,11 @@ impl<R: AtomRepository> AtomService<R> {
     /// - Uses `AtomType::Note`.
     /// - Returns created stable atom ID.
     pub fn create_note(&self, content: impl Into<String>) -> RepoResult<AtomId> {
-        let atom = Atom::new(AtomType::Note, content);
+        let content = content.into();
+        let preview = derive_markdown_preview(content.as_str());
+        let mut atom = Atom::new(AtomType::Note, content);
+        atom.preview_text = preview.preview_text;
+        atom.preview_image = preview.preview_image;
         self.repo.create_atom(&atom)
     }
 

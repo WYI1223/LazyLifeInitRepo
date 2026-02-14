@@ -29,6 +29,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_box_autoadd_i_64(dynamic raw);
 
   @protected
+  NoteItem dco_decode_box_autoadd_note_item(dynamic raw);
+
+  @protected
   int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
@@ -44,10 +47,25 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 dco_decode_i_64(dynamic raw);
 
   @protected
+  List<String> dco_decode_list_String(dynamic raw);
+
+  @protected
   List<EntrySearchItem> dco_decode_list_entry_search_item(dynamic raw);
 
   @protected
+  List<NoteItem> dco_decode_list_note_item(dynamic raw);
+
+  @protected
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
+
+  @protected
+  NoteItem dco_decode_note_item(dynamic raw);
+
+  @protected
+  NoteResponse dco_decode_note_response(dynamic raw);
+
+  @protected
+  NotesListResponse dco_decode_notes_list_response(dynamic raw);
 
   @protected
   String? dco_decode_opt_String(dynamic raw);
@@ -56,7 +74,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? dco_decode_opt_box_autoadd_i_64(dynamic raw);
 
   @protected
+  NoteItem? dco_decode_opt_box_autoadd_note_item(dynamic raw);
+
+  @protected
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
+
+  @protected
+  TagsListResponse dco_decode_tags_list_response(dynamic raw);
 
   @protected
   int dco_decode_u_32(dynamic raw);
@@ -75,6 +99,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   PlatformInt64 sse_decode_box_autoadd_i_64(SseDeserializer deserializer);
+
+  @protected
+  NoteItem sse_decode_box_autoadd_note_item(SseDeserializer deserializer);
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
@@ -96,12 +123,29 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64 sse_decode_i_64(SseDeserializer deserializer);
 
   @protected
+  List<String> sse_decode_list_String(SseDeserializer deserializer);
+
+  @protected
   List<EntrySearchItem> sse_decode_list_entry_search_item(
     SseDeserializer deserializer,
   );
 
   @protected
+  List<NoteItem> sse_decode_list_note_item(SseDeserializer deserializer);
+
+  @protected
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
+
+  @protected
+  NoteItem sse_decode_note_item(SseDeserializer deserializer);
+
+  @protected
+  NoteResponse sse_decode_note_response(SseDeserializer deserializer);
+
+  @protected
+  NotesListResponse sse_decode_notes_list_response(
+    SseDeserializer deserializer,
+  );
 
   @protected
   String? sse_decode_opt_String(SseDeserializer deserializer);
@@ -110,7 +154,13 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   PlatformInt64? sse_decode_opt_box_autoadd_i_64(SseDeserializer deserializer);
 
   @protected
+  NoteItem? sse_decode_opt_box_autoadd_note_item(SseDeserializer deserializer);
+
+  @protected
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  TagsListResponse sse_decode_tags_list_response(SseDeserializer deserializer);
 
   @protected
   int sse_decode_u_32(SseDeserializer deserializer);
@@ -133,6 +183,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_box_autoadd_i_64(
     PlatformInt64 self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_box_autoadd_note_item(
+    NoteItem self,
     SseSerializer serializer,
   );
 
@@ -161,14 +217,32 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_i_64(PlatformInt64 self, SseSerializer serializer);
 
   @protected
+  void sse_encode_list_String(List<String> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_entry_search_item(
     List<EntrySearchItem> self,
     SseSerializer serializer,
   );
 
   @protected
+  void sse_encode_list_note_item(List<NoteItem> self, SseSerializer serializer);
+
+  @protected
   void sse_encode_list_prim_u_8_strict(
     Uint8List self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_note_item(NoteItem self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_note_response(NoteResponse self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_notes_list_response(
+    NotesListResponse self,
     SseSerializer serializer,
   );
 
@@ -182,7 +256,19 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_opt_box_autoadd_note_item(
+    NoteItem? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_tags_list_response(
+    TagsListResponse self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_u_32(int self, SseSerializer serializer);

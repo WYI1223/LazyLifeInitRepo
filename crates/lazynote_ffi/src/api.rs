@@ -14,10 +14,12 @@
 use lazynote_core::db::open_db;
 use lazynote_core::{
     core_version as core_version_inner, init_logging as init_logging_inner, ping as ping_inner,
-    search_all, AtomService, AtomType, ScheduleEventRequest, SearchQuery, SqliteAtomRepository,
+    search_all, AtomId, AtomService, AtomType, NoteRecord, NoteService, NoteServiceError,
+    ScheduleEventRequest, SearchQuery, SqliteAtomRepository, SqliteNoteRepository,
 };
 use std::path::PathBuf;
 use std::sync::Mutex;
+use uuid::Uuid;
 
 const ENTRY_DEFAULT_LIMIT: u32 = 10;
 const ENTRY_LIMIT_MAX: u32 = 10;
@@ -130,6 +132,98 @@ impl EntryActionResponse {
             ok: false,
             atom_id: None,
             message: message.into(),
+        }
+    }
+}
+
+/// Note DTO returned by notes/tags APIs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteItem {
+    /// Stable note atom id.
+    pub atom_id: String,
+    /// Raw markdown content.
+    pub content: String,
+    /// Derived plain-text preview.
+    pub preview_text: Option<String>,
+    /// Derived first markdown image path.
+    pub preview_image: Option<String>,
+    /// Update timestamp in epoch milliseconds.
+    pub updated_at: i64,
+    /// Normalized tags attached to the note.
+    pub tags: Vec<String>,
+}
+
+/// Note create/update/get response envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoteResponse {
+    /// Whether operation succeeded.
+    pub ok: bool,
+    /// Stable machine-readable error code for failure paths.
+    pub error_code: Option<String>,
+    /// Human-readable message for diagnostics/UI.
+    pub message: String,
+    /// Returned note payload on success.
+    pub note: Option<NoteItem>,
+}
+
+/// Note list response envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesListResponse {
+    /// Whether operation succeeded.
+    pub ok: bool,
+    /// Stable machine-readable error code for failure paths.
+    pub error_code: Option<String>,
+    /// Human-readable message for diagnostics/UI.
+    pub message: String,
+    /// Note list items sorted by `updated_at DESC, uuid ASC`.
+    pub items: Vec<NoteItem>,
+    /// Effective limit after normalization.
+    pub applied_limit: u32,
+}
+
+/// Tags list response envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TagsListResponse {
+    /// Whether operation succeeded.
+    pub ok: bool,
+    /// Stable machine-readable error code for failure paths.
+    pub error_code: Option<String>,
+    /// Human-readable message for diagnostics/UI.
+    pub message: String,
+    /// Normalized tags known by storage.
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug)]
+enum NotesFfiError {
+    InvalidNoteId(String),
+    InvalidTag(String),
+    NoteNotFound(String),
+    DbError(String),
+    InvalidArgument(String),
+    Internal(String),
+}
+
+impl NotesFfiError {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::InvalidNoteId(_) => "invalid_note_id",
+            Self::InvalidTag(_) => "invalid_tag",
+            Self::NoteNotFound(_) => "note_not_found",
+            Self::DbError(_) => "db_error",
+            Self::InvalidArgument(_) => "invalid_argument",
+            Self::Internal(_) => "internal_error",
+        }
+    }
+
+    fn message(&self) -> String {
+        match self {
+            Self::InvalidNoteId(value) => format!("invalid note id: {value}"),
+            Self::InvalidTag(value) => format!("invalid tag: {value}"),
+            Self::NoteNotFound(value) => format!("note not found: {value}"),
+            Self::DbError(value) => format!("notes database error: {value}"),
+            Self::InvalidArgument(value) => format!("invalid argument: {value}"),
+            Self::Internal(value) => format!("internal error: {value}"),
         }
     }
 }
@@ -266,6 +360,198 @@ fn entry_schedule_impl(
     }
 }
 
+/// Creates one note from markdown content.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Applies markdown preview hooks (`preview_text`, `preview_image`).
+/// - Returns typed envelope with stable error codes.
+#[flutter_rust_bridge::frb]
+pub async fn note_create(content: String) -> NoteResponse {
+    note_create_impl(content)
+}
+
+fn note_create_impl(content: String) -> NoteResponse {
+    match with_note_service(|service| service.create_note(content)) {
+        Ok(note) => NoteResponse {
+            ok: true,
+            error_code: None,
+            message: "Note created.".to_string(),
+            note: Some(to_note_item(note)),
+        },
+        Err(err) => NoteResponse {
+            ok: false,
+            error_code: Some(err.code().to_string()),
+            message: err.message(),
+            note: None,
+        },
+    }
+}
+
+/// Fully replaces note content by stable id.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `content` is treated as full markdown source replacement.
+/// - Returns typed envelope with stable error codes.
+#[flutter_rust_bridge::frb]
+pub async fn note_update(atom_id: String, content: String) -> NoteResponse {
+    note_update_impl(atom_id, content)
+}
+
+fn note_update_impl(atom_id: String, content: String) -> NoteResponse {
+    let parsed_id = match parse_note_id(atom_id.as_str()) {
+        Ok(value) => value,
+        Err(err) => return note_failure(err),
+    };
+
+    match with_note_service(|service| service.update_note(parsed_id, content)) {
+        Ok(note) => NoteResponse {
+            ok: true,
+            error_code: None,
+            message: "Note updated.".to_string(),
+            note: Some(to_note_item(note)),
+        },
+        Err(err) => note_failure(err),
+    }
+}
+
+/// Gets one note by stable id.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Returns typed envelope with stable error codes.
+#[flutter_rust_bridge::frb]
+pub async fn note_get(atom_id: String) -> NoteResponse {
+    note_get_impl(atom_id)
+}
+
+fn note_get_impl(atom_id: String) -> NoteResponse {
+    let parsed_id = match parse_note_id(atom_id.as_str()) {
+        Ok(value) => value,
+        Err(err) => return note_failure(err),
+    };
+
+    match with_note_service(|service| {
+        service
+            .get_note(parsed_id)
+            .map_err(NoteServiceError::from)?
+            .ok_or(NoteServiceError::NoteNotFound(parsed_id))
+    }) {
+        Ok(note) => NoteResponse {
+            ok: true,
+            error_code: None,
+            message: "Note loaded.".to_string(),
+            note: Some(to_note_item(note)),
+        },
+        Err(err) => note_failure(err),
+    }
+}
+
+/// Lists notes with optional single-tag filter and pagination.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Returns only `AtomType::Note` rows.
+/// - Limit normalization: default 10, max 50.
+#[flutter_rust_bridge::frb]
+pub async fn notes_list(
+    tag: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> NotesListResponse {
+    notes_list_impl(tag, limit, offset)
+}
+
+fn notes_list_impl(
+    tag: Option<String>,
+    limit: Option<u32>,
+    offset: Option<u32>,
+) -> NotesListResponse {
+    let resolved_offset = offset.unwrap_or(0);
+
+    match with_note_service(|service| service.list_notes(tag, limit, resolved_offset)) {
+        Ok(result) => NotesListResponse {
+            ok: true,
+            error_code: None,
+            message: format!("Loaded {} note(s).", result.items.len()),
+            items: result.items.into_iter().map(to_note_item).collect(),
+            applied_limit: result.applied_limit,
+        },
+        Err(err) => NotesListResponse {
+            ok: false,
+            error_code: Some(err.code().to_string()),
+            message: err.message(),
+            items: Vec::new(),
+            applied_limit: lazynote_core::normalize_note_limit(limit),
+        },
+    }
+}
+
+/// Atomically replaces full tag set for one note.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `tags` is treated as complete replacement, not incremental patch.
+/// - Returns typed envelope with stable error codes.
+#[flutter_rust_bridge::frb]
+pub async fn note_set_tags(atom_id: String, tags: Vec<String>) -> NoteResponse {
+    note_set_tags_impl(atom_id, tags)
+}
+
+fn note_set_tags_impl(atom_id: String, tags: Vec<String>) -> NoteResponse {
+    let parsed_id = match parse_note_id(atom_id.as_str()) {
+        Ok(value) => value,
+        Err(err) => return note_failure(err),
+    };
+
+    match with_note_service(|service| service.set_note_tags(parsed_id, tags)) {
+        Ok(note) => NoteResponse {
+            ok: true,
+            error_code: None,
+            message: "Note tags replaced.".to_string(),
+            note: Some(to_note_item(note)),
+        },
+        Err(err) => note_failure(err),
+    }
+}
+
+/// Lists normalized tags known by storage.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Returns typed envelope with stable error codes.
+#[flutter_rust_bridge::frb]
+pub async fn tags_list() -> TagsListResponse {
+    tags_list_impl()
+}
+
+fn tags_list_impl() -> TagsListResponse {
+    match with_note_service(|service| {
+        service
+            .list_tags()
+            .map_err(NoteServiceError::from)
+            .map(|tags| {
+                tags.into_iter()
+                    .map(|tag| tag.to_lowercase())
+                    .collect::<Vec<_>>()
+            })
+    }) {
+        Ok(tags) => TagsListResponse {
+            ok: true,
+            error_code: None,
+            message: format!("Loaded {} tag(s).", tags.len()),
+            tags,
+        },
+        Err(err) => TagsListResponse {
+            ok: false,
+            error_code: Some(err.code().to_string()),
+            message: err.message(),
+            tags: Vec::new(),
+        },
+    }
+}
+
 fn normalize_entry_limit(limit: Option<u32>) -> u32 {
     match limit {
         Some(0) => ENTRY_DEFAULT_LIMIT,
@@ -330,6 +616,79 @@ fn with_atom_service(
     f(&service).map_err(|err| err.to_string())
 }
 
+fn with_note_service<T>(
+    f: impl FnOnce(&mut NoteService<SqliteNoteRepository<'_>>) -> Result<T, NoteServiceError>,
+) -> Result<T, NotesFfiError> {
+    let db_path = resolve_entry_db_path();
+    let mut conn = open_db(&db_path).map_err(|err| NotesFfiError::DbError(err.to_string()))?;
+    let repo = SqliteNoteRepository::try_new(&mut conn)
+        .map_err(|err| NotesFfiError::DbError(err.to_string()))?;
+    let mut service = NoteService::new(repo);
+    f(&mut service).map_err(map_note_service_error)
+}
+
+fn parse_note_id(raw: &str) -> Result<AtomId, NotesFfiError> {
+    Uuid::parse_str(raw.trim()).map_err(|_| NotesFfiError::InvalidNoteId(raw.to_string()))
+}
+
+fn to_note_item(value: NoteRecord) -> NoteItem {
+    NoteItem {
+        atom_id: value.atom_id.to_string(),
+        content: value.content,
+        preview_text: value.preview_text,
+        preview_image: value.preview_image,
+        updated_at: value.updated_at,
+        tags: value.tags,
+    }
+}
+
+fn note_failure(error: NotesFfiError) -> NoteResponse {
+    NoteResponse {
+        ok: false,
+        error_code: Some(error.code().to_string()),
+        message: error.message(),
+        note: None,
+    }
+}
+
+fn map_note_service_error(err: NoteServiceError) -> NotesFfiError {
+    match err {
+        NoteServiceError::InvalidTag(value) => NotesFfiError::InvalidTag(value),
+        NoteServiceError::NoteNotFound(atom_id) => NotesFfiError::NoteNotFound(atom_id.to_string()),
+        NoteServiceError::Repo(repo_err) => map_repo_error(repo_err),
+        NoteServiceError::InconsistentState(details) => {
+            NotesFfiError::Internal(details.to_string())
+        }
+    }
+}
+
+fn map_repo_error(err: lazynote_core::RepoError) -> NotesFfiError {
+    match err {
+        lazynote_core::RepoError::NotFound(atom_id) => {
+            NotesFfiError::NoteNotFound(atom_id.to_string())
+        }
+        lazynote_core::RepoError::Validation(validation) => {
+            NotesFfiError::InvalidArgument(validation.to_string())
+        }
+        lazynote_core::RepoError::Db(db_err) => NotesFfiError::DbError(db_err.to_string()),
+        lazynote_core::RepoError::UninitializedConnection {
+            expected_version,
+            actual_version,
+        } => NotesFfiError::DbError(format!(
+            "repository requires schema {expected_version}, got {actual_version}"
+        )),
+        lazynote_core::RepoError::MissingRequiredTable(table) => {
+            NotesFfiError::DbError(format!("missing required table `{table}`"))
+        }
+        lazynote_core::RepoError::MissingRequiredColumn { table, column } => {
+            NotesFfiError::DbError(format!(
+                "missing required column `{column}` in table `{table}`"
+            ))
+        }
+        lazynote_core::RepoError::InvalidData(details) => NotesFfiError::InvalidArgument(details),
+    }
+}
+
 fn to_entry_search_item(hit: lazynote_core::SearchHit) -> EntrySearchItem {
     EntrySearchItem {
         atom_id: hit.atom_id.to_string(),
@@ -350,47 +709,64 @@ fn atom_type_label(kind: AtomType) -> &'static str {
 mod tests {
     use super::{
         configure_entry_db_path, core_version, entry_create_note_impl, entry_create_task_impl,
-        entry_schedule_impl, entry_search_impl, init_logging, ping,
+        entry_schedule_impl, entry_search_impl, init_logging, note_create_impl, note_get_impl,
+        note_set_tags_impl, note_update_impl, notes_list_impl, ping, tags_list_impl,
     };
     use lazynote_core::db::open_db;
+    use std::sync::{Mutex, MutexGuard};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEST_DB_LOCK: Mutex<()> = Mutex::new(());
+
+    fn acquire_test_db_lock() -> MutexGuard<'static, ()> {
+        TEST_DB_LOCK
+            .lock()
+            .expect("ffi api test db lock should not be poisoned")
+    }
 
     #[test]
     fn ping_returns_pong() {
+        let _guard = acquire_test_db_lock();
         assert_eq!(ping(), "pong");
     }
 
     #[test]
     fn version_is_not_empty() {
+        let _guard = acquire_test_db_lock();
         assert!(!core_version().is_empty());
     }
 
     #[test]
     fn init_logging_rejects_empty_log_dir() {
+        let _guard = acquire_test_db_lock();
         let error = init_logging("info".to_string(), String::new());
         assert!(!error.is_empty());
     }
 
     #[test]
     fn init_logging_rejects_unsupported_level() {
+        let _guard = acquire_test_db_lock();
         let error = init_logging("verbose".to_string(), "tmp/logs".to_string());
         assert!(!error.is_empty());
     }
 
     #[test]
     fn configure_entry_db_path_rejects_empty_path() {
+        let _guard = acquire_test_db_lock();
         let error = configure_entry_db_path(String::new());
         assert!(!error.is_empty());
     }
 
     #[test]
     fn configure_entry_db_path_rejects_relative_path() {
+        let _guard = acquire_test_db_lock();
         let error = configure_entry_db_path("relative/path.sqlite3".to_string());
         assert!(!error.is_empty());
     }
 
     #[test]
     fn entry_search_normalizes_limit_and_finds_created_note() {
+        let _guard = acquire_test_db_lock();
         let token = unique_token("entry-search");
         let created = entry_create_note_impl(format!("note {token}"));
         assert!(created.ok, "{}", created.message);
@@ -408,6 +784,7 @@ mod tests {
 
     #[test]
     fn entry_create_task_sets_default_todo_status() {
+        let _guard = acquire_test_db_lock();
         let task = entry_create_task_impl("todo".to_string());
         assert!(task.ok, "{}", task.message);
         let atom_id = task.atom_id.expect("task create should return atom_id");
@@ -426,6 +803,7 @@ mod tests {
 
     #[test]
     fn entry_schedule_supports_point_shape() {
+        let _guard = acquire_test_db_lock();
         let title = unique_token("entry-schedule-point");
         let response = entry_schedule_impl(title, 1_700_000_000_000, None);
         assert!(response.ok, "{}", response.message);
@@ -446,9 +824,113 @@ mod tests {
 
     #[test]
     fn entry_schedule_rejects_reversed_time_range() {
+        let _guard = acquire_test_db_lock();
         let response = entry_schedule_impl("bad range".to_string(), 2_000, Some(1_000));
         assert!(!response.ok);
         assert!(response.message.contains("event_end"));
+    }
+
+    #[test]
+    fn note_create_and_get_returns_typed_payload() {
+        let _guard = acquire_test_db_lock();
+        let created = note_create_impl("# heading ![](first.png)".to_string());
+        assert!(created.ok, "{}", created.message);
+        assert!(created.error_code.is_none());
+        let atom_id = created
+            .note
+            .as_ref()
+            .expect("note payload should exist")
+            .atom_id
+            .clone();
+
+        let loaded = note_get_impl(atom_id);
+        assert!(loaded.ok, "{}", loaded.message);
+        assert!(loaded.error_code.is_none());
+        assert_eq!(
+            loaded
+                .note
+                .as_ref()
+                .and_then(|note| note.preview_image.as_deref()),
+            Some("first.png")
+        );
+    }
+
+    #[test]
+    fn note_update_uses_full_replace_and_updates_preview() {
+        let _guard = acquire_test_db_lock();
+        let created = note_create_impl("first body".to_string());
+        assert!(created.ok, "{}", created.message);
+        let atom_id = created
+            .note
+            .as_ref()
+            .expect("created note payload")
+            .atom_id
+            .clone();
+
+        let updated = note_update_impl(atom_id, "second body ![](two.png)".to_string());
+        assert!(updated.ok, "{}", updated.message);
+        assert_eq!(
+            updated
+                .note
+                .as_ref()
+                .and_then(|note| note.preview_image.as_deref()),
+            Some("two.png")
+        );
+    }
+
+    #[test]
+    fn notes_list_caps_limit_and_filters_single_tag() {
+        let _guard = acquire_test_db_lock();
+        let first = note_create_impl("work note".to_string());
+        assert!(first.ok, "{}", first.message);
+        let first_id = first.note.as_ref().expect("first note").atom_id.clone();
+        let second = note_create_impl("other note".to_string());
+        assert!(second.ok, "{}", second.message);
+        let second_id = second.note.as_ref().expect("second note").atom_id.clone();
+
+        let tag_set = note_set_tags_impl(
+            first_id.clone(),
+            vec![
+                "Work".to_string(),
+                "work".to_string(),
+                "Important".to_string(),
+            ],
+        );
+        assert!(tag_set.ok, "{}", tag_set.message);
+
+        let filtered = notes_list_impl(Some("work".to_string()), Some(200), Some(0));
+        assert!(filtered.ok, "{}", filtered.message);
+        assert_eq!(filtered.applied_limit, 50);
+        assert!(filtered.items.iter().any(|item| item.atom_id == first_id));
+        assert!(!filtered.items.iter().any(|item| item.atom_id == second_id));
+    }
+
+    #[test]
+    fn note_get_invalid_id_returns_error_code() {
+        let _guard = acquire_test_db_lock();
+        let response = note_get_impl("not-a-uuid".to_string());
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("invalid_note_id"));
+    }
+
+    #[test]
+    fn tags_list_returns_normalized_values() {
+        let _guard = acquire_test_db_lock();
+        let created = note_create_impl("tag source".to_string());
+        assert!(created.ok, "{}", created.message);
+        let atom_id = created
+            .note
+            .as_ref()
+            .expect("created note payload")
+            .atom_id
+            .clone();
+        let tagged = note_set_tags_impl(atom_id, vec!["Work".to_string(), "HOME".to_string()]);
+        assert!(tagged.ok, "{}", tagged.message);
+
+        let tags = tags_list_impl();
+        assert!(tags.ok, "{}", tags.message);
+        assert!(tags.tags.contains(&"work".to_string()));
+        assert!(tags.tags.contains(&"home".to_string()));
     }
 
     fn unique_token(prefix: &str) -> String {

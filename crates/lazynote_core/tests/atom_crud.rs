@@ -205,7 +205,7 @@ fn repository_rejects_connection_missing_required_atoms_column() {
         result,
         Err(RepoError::MissingRequiredColumn {
             table: "atoms",
-            column: "updated_at"
+            column: "preview_text"
         })
     ));
 }

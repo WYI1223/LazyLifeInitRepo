@@ -6,8 +6,9 @@
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:lazynote_flutter/core/bindings/frb_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `atom_type_label`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `normalize_entry_limit`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `to_entry_search_item`, `with_atom_service`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`
+// These functions are ignored because they are not marked as `pub`: `atom_type_label`, `code`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `map_note_service_error`, `map_repo_error`, `message`, `normalize_entry_limit`, `note_create_impl`, `note_failure`, `note_get_impl`, `note_set_tags_impl`, `note_update_impl`, `notes_list_impl`, `parse_note_id`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `tags_list_impl`, `to_entry_search_item`, `to_note_item`, `with_atom_service`, `with_note_service`
+// These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `NotesFfiError`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Minimal health-check API for FRB smoke integration.
 ///
@@ -91,6 +92,65 @@ Future<EntryActionResponse> entrySchedule({
   startEpochMs: startEpochMs,
   endEpochMs: endEpochMs,
 );
+
+/// Creates one note from markdown content.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Applies markdown preview hooks (`preview_text`, `preview_image`).
+/// - Returns typed envelope with stable error codes.
+Future<NoteResponse> noteCreate({required String content}) =>
+    RustLib.instance.api.crateApiNoteCreate(content: content);
+
+/// Fully replaces note content by stable id.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `content` is treated as full markdown source replacement.
+/// - Returns typed envelope with stable error codes.
+Future<NoteResponse> noteUpdate({
+  required String atomId,
+  required String content,
+}) => RustLib.instance.api.crateApiNoteUpdate(atomId: atomId, content: content);
+
+/// Gets one note by stable id.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Returns typed envelope with stable error codes.
+Future<NoteResponse> noteGet({required String atomId}) =>
+    RustLib.instance.api.crateApiNoteGet(atomId: atomId);
+
+/// Lists notes with optional single-tag filter and pagination.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Returns only `AtomType::Note` rows.
+/// - Limit normalization: default 10, max 50.
+Future<NotesListResponse> notesList({String? tag, int? limit, int? offset}) =>
+    RustLib.instance.api.crateApiNotesList(
+      tag: tag,
+      limit: limit,
+      offset: offset,
+    );
+
+/// Atomically replaces full tag set for one note.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `tags` is treated as complete replacement, not incremental patch.
+/// - Returns typed envelope with stable error codes.
+Future<NoteResponse> noteSetTags({
+  required String atomId,
+  required List<String> tags,
+}) => RustLib.instance.api.crateApiNoteSetTags(atomId: atomId, tags: tags);
+
+/// Lists normalized tags known by storage.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - Returns typed envelope with stable error codes.
+Future<TagsListResponse> tagsList() => RustLib.instance.api.crateApiTagsList();
 
 /// Generic action response envelope for single-entry command flow.
 class EntryActionResponse {
@@ -195,4 +255,172 @@ class EntrySearchResponse {
           items == other.items &&
           message == other.message &&
           appliedLimit == other.appliedLimit;
+}
+
+/// Note DTO returned by notes/tags APIs.
+class NoteItem {
+  /// Stable note atom id.
+  final String atomId;
+
+  /// Raw markdown content.
+  final String content;
+
+  /// Derived plain-text preview.
+  final String? previewText;
+
+  /// Derived first markdown image path.
+  final String? previewImage;
+
+  /// Update timestamp in epoch milliseconds.
+  final PlatformInt64 updatedAt;
+
+  /// Normalized tags attached to the note.
+  final List<String> tags;
+
+  const NoteItem({
+    required this.atomId,
+    required this.content,
+    this.previewText,
+    this.previewImage,
+    required this.updatedAt,
+    required this.tags,
+  });
+
+  @override
+  int get hashCode =>
+      atomId.hashCode ^
+      content.hashCode ^
+      previewText.hashCode ^
+      previewImage.hashCode ^
+      updatedAt.hashCode ^
+      tags.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NoteItem &&
+          runtimeType == other.runtimeType &&
+          atomId == other.atomId &&
+          content == other.content &&
+          previewText == other.previewText &&
+          previewImage == other.previewImage &&
+          updatedAt == other.updatedAt &&
+          tags == other.tags;
+}
+
+/// Note create/update/get response envelope.
+class NoteResponse {
+  /// Whether operation succeeded.
+  final bool ok;
+
+  /// Stable machine-readable error code for failure paths.
+  final String? errorCode;
+
+  /// Human-readable message for diagnostics/UI.
+  final String message;
+
+  /// Returned note payload on success.
+  final NoteItem? note;
+
+  const NoteResponse({
+    required this.ok,
+    this.errorCode,
+    required this.message,
+    this.note,
+  });
+
+  @override
+  int get hashCode =>
+      ok.hashCode ^ errorCode.hashCode ^ message.hashCode ^ note.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NoteResponse &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          errorCode == other.errorCode &&
+          message == other.message &&
+          note == other.note;
+}
+
+/// Note list response envelope.
+class NotesListResponse {
+  /// Whether operation succeeded.
+  final bool ok;
+
+  /// Stable machine-readable error code for failure paths.
+  final String? errorCode;
+
+  /// Human-readable message for diagnostics/UI.
+  final String message;
+
+  /// Note list items sorted by `updated_at DESC, uuid ASC`.
+  final List<NoteItem> items;
+
+  /// Effective limit after normalization.
+  final int appliedLimit;
+
+  const NotesListResponse({
+    required this.ok,
+    this.errorCode,
+    required this.message,
+    required this.items,
+    required this.appliedLimit,
+  });
+
+  @override
+  int get hashCode =>
+      ok.hashCode ^
+      errorCode.hashCode ^
+      message.hashCode ^
+      items.hashCode ^
+      appliedLimit.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NotesListResponse &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          errorCode == other.errorCode &&
+          message == other.message &&
+          items == other.items &&
+          appliedLimit == other.appliedLimit;
+}
+
+/// Tags list response envelope.
+class TagsListResponse {
+  /// Whether operation succeeded.
+  final bool ok;
+
+  /// Stable machine-readable error code for failure paths.
+  final String? errorCode;
+
+  /// Human-readable message for diagnostics/UI.
+  final String message;
+
+  /// Normalized tags known by storage.
+  final List<String> tags;
+
+  const TagsListResponse({
+    required this.ok,
+    this.errorCode,
+    required this.message,
+    required this.tags,
+  });
+
+  @override
+  int get hashCode =>
+      ok.hashCode ^ errorCode.hashCode ^ message.hashCode ^ tags.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TagsListResponse &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          errorCode == other.errorCode &&
+          message == other.message &&
+          tags == other.tags;
 }
