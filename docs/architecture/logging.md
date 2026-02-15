@@ -159,8 +159,8 @@ Constraints:
   - structured logging is enabled
   - rolling appender is enabled (`10MB x 5`)
   - log format: `flexi_logger::detailed_format` (added in PR-0017A)
-    - line format: `[YYYY-MM-DD HH:MM:SS.ffffff TZ] LEVEL [file:line] message`
-    - example: `[2026-02-15 10:23:45.123456 UTC] INFO [src/logging.rs:100] event=app_start`
+    - line format: `[YYYY-MM-DD HH:MM:SS.ffffff TZ] LEVEL [module] file:line: message`
+    - example: `[2026-02-15 10:23:45.123456 +00:00] INFO [lazynote_core::logging] src/logging.rs:100: event=app_start`
   - startup + core operations emit metadata-only events
 - Flutter side:
   - computes `log_dir` via `path_provider`

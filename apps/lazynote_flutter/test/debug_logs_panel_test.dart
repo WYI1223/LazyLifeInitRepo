@@ -114,9 +114,9 @@ void main() {
 
   // --- LogLineMeta unit tests ---
 
-  test('LogLineMeta parses detailed_format line — INFO', () {
+  test('LogLineMeta parses detailed_format line - INFO', () {
     const line =
-        '[2026-02-15 10:23:45.123456 UTC] INFO [src/logging.rs:100] event=app_start';
+        '[2026-02-15 10:23:45.123456 +00:00] INFO [lazynote_core::logging] src/logging.rs:100: event=app_start';
     final meta = LogLineMeta.parse(line);
     expect(meta.timestamp, equals('10:23:45.123'));
     expect(meta.level, equals('info'));
@@ -124,21 +124,31 @@ void main() {
     expect(meta.raw, equals(line));
   });
 
-  test('LogLineMeta parses detailed_format line — WARN with offset timezone', () {
+  test('LogLineMeta parses detailed_format line - WARN with offset timezone', () {
     const line =
-        '[2026-02-15 10:23:45.654321 +08:00] WARN [src/service.rs:42] event=slow_query';
+        '[2026-02-15 10:23:45.654321 +08:00] WARN [lazynote_core::search::fts] src/service.rs:42: event=slow_query';
     final meta = LogLineMeta.parse(line);
     expect(meta.timestamp, equals('10:23:45.654'));
     expect(meta.level, equals('warn'));
     expect(meta.message, equals('event=slow_query'));
   });
 
-  test('LogLineMeta parses detailed_format line — ERROR', () {
+  test('LogLineMeta parses detailed_format line - ERROR', () {
     const line =
-        '[2026-02-15 10:23:46.000001 UTC] ERROR [src/db.rs:7] event=panic_captured';
+        '[2026-02-15 10:23:46.000001 +00:00] ERROR [lazynote_core::db::open] src/db.rs:7: event=panic_captured';
     final meta = LogLineMeta.parse(line);
     expect(meta.level, equals('error'));
     expect(meta.timestamp, equals('10:23:46.000'));
+  });
+
+  test('LogLineMeta parses legacy default_format line for level badge', () {
+    const line =
+        'INFO [lazynote_core::db::open] event=db_open module=db status=ok';
+    final meta = LogLineMeta.parse(line);
+    expect(meta.timestamp, isNull);
+    expect(meta.level, equals('info'));
+    expect(meta.message, equals('event=db_open module=db status=ok'));
+    expect(meta.raw, equals(line));
   });
 
   test('LogLineMeta gracefully handles unrecognised format', () {
@@ -163,7 +173,7 @@ void main() {
     WidgetTester tester,
   ) async {
     const errorLine =
-        '[2026-02-15 10:23:46.000001 UTC] ERROR [src/db.rs:7] event=panic_captured';
+        '[2026-02-15 10:23:46.000001 +00:00] ERROR [lazynote_core::db::open] src/db.rs:7: event=panic_captured';
 
     await tester.pumpWidget(
       MaterialApp(

@@ -248,9 +248,7 @@ class _DebugLogsPanelState extends State<DebugLogsPanel>
         controller: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final line in lines) _LogLineRow(line: line),
-          ],
+          children: [for (final line in lines) _LogLineRow(line: line)],
         ),
       ),
     );
@@ -365,8 +363,8 @@ class _LogLineRow extends StatelessWidget {
 
   final String line;
 
-  static const double _timestampWidth = 96;
-  static const double _levelWidth = 52;
+  static const double _timestampWidth = 76;
+  static const double _levelWidth = 40;
   static const double _fontSize = 12;
 
   @override
