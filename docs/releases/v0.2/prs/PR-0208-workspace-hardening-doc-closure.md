@@ -21,6 +21,21 @@ Out of scope:
 - recursive split UX (v0.3)
 - long-document performance gate (v0.3)
 
+## Regression Targets from Pre-Feature Hardening PRs
+
+The following items were addressed in PR-0219/0220A/0220B and by design in PR-0204.
+PR-0208 must include regression confirmation that they survive the full v0.2 refactor:
+
+| Source | Finding | Verification |
+|--------|---------|-------------|
+| PR-0204 design constraint (R02-1.2) | Save coordinator has bounded retry (≤ 5) | test: save-failure + concurrent typing does not block tab close indefinitely |
+| PR-0204 design constraint (R02-1.1) | Draft buffer always from `buffersByNoteId` | test: tab/pane switch renders last-typed content, not server snapshot |
+| PR-0204 design constraint (R02-1.3) | Closed-tab tag mutations do not fire FFI | test: close tab → pending tag queue → FFI call count = 0 |
+| PR-0219 (R01-4 WAL) | `journal_mode=WAL` survives new migrations | `PRAGMA journal_mode;` = `wal` after all v0.2 migrations applied |
+| PR-0219 (R01-5 error codes) | `entry_search` uses stable codes | no `"db_open_failed"` / `"search_failed"` in test assertions |
+| PR-0220A (R02-3.3) | No double `dlopen` on FRB init failure | `rustLibInit` invoked ≤ 1 time even with concurrent callers after failure |
+| PR-0220B (R02-2.1) | `loggingLevelOverride` applied on startup | settings override value flows through `bootstrapLogging` in integration |
+
 ## Step-by-Step
 
 1. Audit async state races in workspace provider.
@@ -29,7 +44,8 @@ Out of scope:
    - tree refresh during open tabs
    - move/rename under active note
 3. Harden error recovery UX (`SnackBar + Retry` paths).
-4. Update release and architecture docs.
+4. Verify all regression targets from the table above.
+5. Update release and architecture docs.
 
 ## Planned File Changes
 

@@ -36,7 +36,10 @@ For compatibility-sensitive changes, PR must include:
 3. release note update in `docs/releases/`
 4. migration guidance if callers must change
 
-## v0.1 Practical Rule
+## v0.x Practical Rule
 
-v0.1 allows fast iteration, but contract breaks still require explicit documentation in the same PR.
-Silent API drift is not allowed.
+In v0.x (pre-v1.0), FFI contracts and error codes may change with documented rationale in the same PR.
+Fast iteration is allowed; silent API drift is not.
+
+Stability guarantee starts at **v1.0**: from v1.0 onward, all changes to public API surfaces are subject
+to the full breaking-change process above, including migration guidance and release note updates.

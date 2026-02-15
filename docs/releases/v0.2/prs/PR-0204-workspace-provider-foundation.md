@@ -37,6 +37,32 @@ Design rule:
 - visual widgets consume provider selectors
 - editor components remain layout-agnostic and reusable
 
+## Design Constraints from Engineering Review
+
+The following bugs found in v0.1 `NotesController` (review-02 §1.1–1.3) must be
+addressed by design in `WorkspaceProvider`, not patched onto the old controller:
+
+**R02-1.1 — Draft buffer coherence on pane/tab switch**
+
+`activeDraftContent` in v0.1 uses a three-branch fallback that can return stale server
+content after a tab switch (local draft map is correct, but the active-id pointer lags in
+some `_loadNotes` paths).  In the new design, `buffersByNoteId` must be the single
+authoritative source for draft reads.  When active pane or tab changes, derive content
+directly from `buffersByNoteId[activeNoteId]` — no secondary "active content" field.
+
+**R02-1.2 — Save flush must have a bounded retry limit**
+
+The v0.1 `flushPendingSave` uses an unbounded `while (true)` loop.  If the FFI save fails
+AND the user keeps typing (version counter increments), the loop never exits, blocking tab
+close indefinitely.  The new save coordinator must cap flush retries (suggested: 5) and
+transition to `save_error` state after exhausting retries.
+
+**R02-1.3 — Tag mutations must not fire after tab close**
+
+The v0.1 Promise-chain tag mutation queue does not guard against the target note being
+closed mid-flight.  The new `WorkspaceProvider` tag dispatch must check that the note is
+still present in `openTabsByPane` before issuing the FFI call.
+
 ## Step-by-Step
 
 1. Add provider and models in `features/workspace/`.
@@ -63,4 +89,10 @@ Design rule:
 - [ ] Notes buffers are provider-owned and reusable by future pane layouts.
 - [ ] Active pane and tab state are explicit and test-covered.
 - [ ] Existing v0.1 note flows still pass.
+- [ ] (R02-1.1) Active draft content is always derived from `buffersByNoteId`; no stale
+      content appears after tab/pane switch in widget tests.
+- [ ] (R02-1.2) Save flush coordinator has a bounded retry count (≤ 5) and transitions to
+      `save_error` on exhaustion; test covers the save-failure + in-progress-typing case.
+- [ ] (R02-1.3) Tag mutation dispatch checks note presence in open tabs before FFI call;
+      test covers close-then-tag-queue scenario.
 

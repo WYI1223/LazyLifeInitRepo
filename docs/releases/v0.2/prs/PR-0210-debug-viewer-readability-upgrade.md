@@ -15,6 +15,12 @@ In scope:
 - tighten severity visual hierarchy in high-density log lists
 - preserve existing refresh/coalescing safety behavior
 - improve multi-line wrapping and copy workflows for long log rows
+- **[optional]** `log_dart_event` FFI bridge: a new sync FFI function that writes
+  structured Dart-side events (level, event name, module, message) into the Rust rolling
+  log file (review-02 §4.3).  This unifies Dart and Rust log streams so the diagnostics
+  viewer shows a single timeline.  Requires running `gen_bindings.ps1` after adding the
+  function to `api.rs`.  Include in this PR if the codegen step does not block the
+  readability work; otherwise defer to `PR-0208`.
 
 Out of scope:
 
@@ -41,6 +47,10 @@ Out of scope:
 - [edit] `apps/lazynote_flutter/lib/core/debug/log_reader.dart`
 - [add] `apps/lazynote_flutter/lib/features/diagnostics/log_line_parser.dart`
 - [add] `apps/lazynote_flutter/test/debug_viewer_readability_test.dart`
+- [edit] `crates/lazynote_ffi/src/api.rs` — [optional] add `log_dart_event` sync FFI fn
+- [edit] `crates/lazynote_ffi/src/frb_generated.rs` — [optional, codegen] regenerated
+- [edit] `apps/lazynote_flutter/lib/core/bindings/api.dart` — [optional, codegen]
+  regenerated
 
 ## Dependencies
 
@@ -57,3 +67,5 @@ Out of scope:
 - [ ] Parser normalization handles mixed timestamp/level raw formats.
 - [ ] Dense rows preserve readability and raw copy fidelity.
 - [ ] Existing refresh stability behavior is preserved.
+- [ ] [If `log_dart_event` implemented] Calling `logDartEvent` from Dart writes a
+      `source=dart` structured entry into the Rust log file at the correct timestamp.

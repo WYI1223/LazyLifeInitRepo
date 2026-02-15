@@ -14,11 +14,13 @@
 
 - `crates/lazynote_ffi` 仅导出用例级 API（例如 `create_note`、`search`、`schedule`）。
 - 禁止暴露数据库底层细节（例如 `insert_row`、`update_table`）。
+- 例外：`debug_*` / `experimental_*` 前缀函数可为诊断面板暴露底层钩子，但不承诺稳定性。
 
 ### Rule C: Stable ID + soft delete
 
 - 所有核心实体必须使用稳定 ID（`uuid` / `atom_id`）。
-- 删除必须默认走软删除字段，以支持同步、恢复与审计。
+- **业务路径**删除必须走软删除字段（`is_deleted`），以支持同步、恢复与审计。
+- 例外：维护工具（vacuum、retention purge）可硬删除，但需有 ADR 记录原因。
 
 ### Rule D: External sync must use mapping/version fields
 
@@ -33,9 +35,10 @@
 ### Rule F: Local runtime files must use unified app root
 
 - 所有用户可写运行时文件必须归档到统一根目录 `LazyLife`。
-- Windows 强制路径：`%APPDATA%/LazyLife/`。
-- 其他平台 fallback：`<app_support>/LazyLife/`。
+- Windows 默认路径：`%APPDATA%/LazyLife/`。
+- 其他平台默认路径：`<app_support>/LazyLife/`。
 - 包括但不限于：`settings.json`、`logs/`、`data/`（本地数据库与缓存）。
+- 根目录与 DB 路径可通过 `settings.json` 或 `configure_entry_db_path()` 覆盖；所有路径解析必须在 Core 统一处理。
 
 ## 2. Code Quality Gates (Mandatory)
 

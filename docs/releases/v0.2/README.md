@@ -64,16 +64,20 @@ This is the required substrate for v0.3 recursive split and drag-to-split.
 
 In scope:
 
+- **v0.1 → v0.2 infrastructure bridge** (execute first, before feature lanes):
+  - Rust safety + observability hardening (`PR-0219`)
+  - Flutter RustBridge lifecycle hardening (`PR-0220A`)
+  - settings & config correctness (`PR-0220B`)
 - global hotkey quick-entry window (`PR-0201`)
 - notes tree schema + repository/service (`PR-0202`)
 - tree FFI contracts + docs update (`PR-0203`)
-- workspace provider foundation (`PR-0204`)
+- workspace provider foundation — incl. R02-1.1/1.2/1.3 design constraints (`PR-0204`)
 - recursive explorer UI with lazy loading (`PR-0205`)
 - split layout v1 (limited split, min-size guard) (`PR-0206`)
 - explorer context actions + drag-reorder baseline (`PR-0207`)
-- hardening and release closure (`PR-0208`)
+- hardening and release closure — incl. regression verification for bridge PRs (`PR-0208`)
 - CN/EN localization baseline (`PR-0209`)
-- debug viewer readability phase-2 upgrade (`PR-0210`)
+- debug viewer readability phase-2 upgrade — incl. optional `log_dart_event` FFI (`PR-0210`)
 - docs language policy and docs index baseline (`PR-0211`)
 - links/index/open foundation (`PR-0212`)
 - extension kernel contracts (`PR-0213`)
@@ -109,6 +113,10 @@ Parallel track allowed:
 
 Recommended order:
 
+0. **Infrastructure bridge lane** (must land before feature work):
+   - `PR-0219-rust-infrastructure-hardening` (Rust-only; fixes HIGH-risk data-path bugs)
+   - `PR-0220A-flutter-lifecycle-hardening` (rust_bridge.dart; can run after PR-0219)
+   - `PR-0220B-settings-config-hardening` (local_settings_store.dart; can run parallel with PR-0220A)
 1. Core contract lane:
    - `PR-0202-notes-tree-schema-core`
    - `PR-0203-tree-ffi-contracts`
@@ -119,19 +127,19 @@ Recommended order:
    - `PR-0216-ui-extension-slots`
    - `PR-0217-plugin-capability-model`
    - `PR-0218-api-lifecycle-policy`
-3. Workspace lane:
-   - `PR-0204-workspace-provider-foundation`
+3. Workspace lane (depends on bridge lane complete):
+   - `PR-0204-workspace-provider-foundation` (addresses R02-1.1/1.2/1.3 by design)
    - `PR-0205-explorer-recursive-lazy-ui`
    - `PR-0206-split-layout-v1`
    - `PR-0207-explorer-context-actions-dnd-baseline`
 4. Support lane (parallel after shell baseline is stable):
    - `PR-0209-ui-localization-cn-en`
-   - `PR-0210-debug-viewer-readability-upgrade`
+   - `PR-0210-debug-viewer-readability-upgrade` (optional: add log_dart_event FFI)
    - `PR-0211-docs-language-policy-and-index`
    - `PR-0212-links-index-open-v1`
    - `PR-0201-global-hotkey-quick-entry`
 5. Closure:
-   - `PR-0208-workspace-hardening-doc-closure`
+   - `PR-0208-workspace-hardening-doc-closure` (verifies regression targets from bridge lane)
 
 ## Quality Gates
 
@@ -159,6 +167,14 @@ v0.2 is complete when:
 10. API lifecycle/deprecation policy is documented and linked from governance docs.
 
 ## PR Specs
+
+Infrastructure bridge (execute first):
+
+- `docs/releases/v0.2/prs/PR-0219-rust-infrastructure-hardening.md`
+- `docs/releases/v0.2/prs/PR-0220A-flutter-lifecycle-hardening.md`
+- `docs/releases/v0.2/prs/PR-0220B-settings-config-hardening.md`
+
+Feature lanes:
 
 - `docs/releases/v0.2/prs/PR-0201-global-hotkey-quick-entry.md`
 - `docs/releases/v0.2/prs/PR-0202-notes-tree-schema-core.md`

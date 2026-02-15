@@ -15,6 +15,8 @@ In scope:
 - add severity-aware coloring (`trace/debug/info/warn/error`)
 - keep raw log text copy behavior unchanged
 - keep existing refresh/coalescing/tail-window behavior unchanged
+- filter incomplete (non-newline-terminated) trailing lines before display, preventing
+  truncated-row artefacts caused by concurrent `flexi_logger` writes (review-02 §4.4)
 
 Out of scope:
 
@@ -32,7 +34,8 @@ Out of scope:
 ## Planned File Changes
 
 - [edit] `apps/lazynote_flutter/lib/features/diagnostics/debug_logs_panel.dart`
-- [edit] `apps/lazynote_flutter/lib/core/debug/log_reader.dart` (if metadata helper is needed)
+- [edit] `apps/lazynote_flutter/lib/core/debug/log_reader.dart` — add incomplete-line guard:
+  discard the last line of file content if it does not end with `\n` (review-02 §4.4)
 - [add] `apps/lazynote_flutter/lib/features/diagnostics/log_line_meta.dart` (optional)
 - [add/edit] `apps/lazynote_flutter/test/debug_logs_panel_test.dart`
 
@@ -51,4 +54,6 @@ Out of scope:
 - [ ] Debug log rows show a stable timestamp presentation.
 - [ ] Severity levels are visually distinct and readable in light theme.
 - [ ] Existing refresh stability behavior remains unchanged.
+- [ ] Log reader discards any incomplete trailing line (not ending with `\n`); tests verify
+      no truncated rows appear under concurrent write simulation.
 
