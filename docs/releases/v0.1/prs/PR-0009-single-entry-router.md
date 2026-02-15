@@ -24,8 +24,8 @@ This work is split into four smaller PRs:
 4. On command/search error, keep current input and show error message (colorized UI hint is allowed).
 5. `> task` should create task atoms with default status `todo`.
 6. `> schedule` should support both time point and time range in one date format family:
-   - point: creates event with `event_start` and `event_end = null`
-   - range: creates event with both `event_start` and `event_end`
+   - point: creates event with `event_start` and `event_end = null` _(renamed to `start_at`/`end_at` in Migration 6, v0.1.5)_
+   - range: creates event with both `event_start` and `event_end` _(renamed to `start_at`/`end_at` in Migration 6, v0.1.5)_
 7. Single Entry is opened from Workbench by a dedicated button; it does not replace Workbench as the landing page.
 8. Input behavior split:
    - every input change triggers parser/router (and search path where applicable)

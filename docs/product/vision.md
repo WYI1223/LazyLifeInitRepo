@@ -122,7 +122,8 @@ LazyNote 把笔记、任务、事件统一为“原子（Atom）”，避免多�
 - `type`: `note | task | event | ...`
 - `content`: Markdown 正文
 - `task_status`: 任务状态
-- `event_start` / `event_end`: 时间区间
+- `start_at` / `end_at`: 时间区间（原 `event_start`/`event_end`，Migration 6 重命名）
+- `recurrence_rule`: RFC 5545 RRULE 字符串（v0.2+ 启用，当前保留为 NULL）
 - `hlc_timestamp`: 混合逻辑时钟（CRDT 合并）
 - `is_deleted`: 软删除标记
 

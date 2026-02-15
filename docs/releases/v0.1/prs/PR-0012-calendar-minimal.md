@@ -17,7 +17,7 @@ This PR remains a post-v0.1 backlog candidate.
 In scope:
 
 - day and week timeline views (minimal blocks)
-- create/update schedule window based on `event_start/event_end`
+- create/update schedule window based on `start_at`/`end_at`
 - read-only relation to task context (if linked)
 
 Out of scope:
@@ -26,12 +26,27 @@ Out of scope:
 - overlapping-event conflict resolver UI
 - recurrence editor
 
+## Architecture Note (Atom Time-Matrix, v0.1.5+)
+
+Calendar events are **not a separate entity**. Under the unified Atom model, an "event" is
+an atom in the `[Value, Value]` quadrant (`start_at IS NOT NULL AND end_at IS NOT NULL`).
+
+Implications for implementation:
+
+- `event_repo.rs` listed below must NOT create a new table. Replace with a calendar
+  query method on `AtomRepository` that filters atoms by `start_at`/`end_at` range overlap.
+- `calendar_service.rs` queries the `atoms` table directly; no new migration required for
+  event storage.
+- Schedule mutation creates/updates atoms with `kind = event`, sets `start_at`/`end_at`;
+  `task_status` remains NULL unless explicitly set.
+- Calendar view renders atoms whose time ranges overlap the displayed day/week window.
+
 ## Optimized Phases
 
 Phase A (Core + FFI):
 
-- add calendar/event query and schedule mutation APIs
-- enforce start/end validation in service boundary
+- add calendar query and schedule mutation APIs (queries `atoms` table, no new entity)
+- enforce start/end validation in service boundary (reuses `Atom::validate()`)
 - expose FFI APIs and tests
 
 Phase B (Flutter UI):

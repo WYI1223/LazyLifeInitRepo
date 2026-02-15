@@ -17,13 +17,19 @@
 
 ## M3 - v0.1 Closure (Notes + Diagnostics)
 
-- PR0010C2, PR0010C3, PR0010C4, PR0010D, PR0017A
-- Status: In Progress
+- PR0010C2 ✓, PR0010C3 ✓, PR0010C4 ✓, PR0010D ✓, PR0017A
+- Status: Near complete — PR-0017A remaining
 
-## M4 - Post-v0.1 Deferred Backlog
+## M3.5 - v0.1.5 (Atom Time-Matrix)
 
-- PR0011, PR0012, PR0013, PR0014, PR0015, PR0016
-- Status: Deferred (replanned into v0.2+ tracks)
+- PR0011
+- Status: Planned (gate: M3 must close first)
+- Spec: `docs/releases/v0.1.5/README.md`
+
+## M4 - Post-v0.1.5 Deferred Backlog
+
+- PR0012, PR0013, PR0014, PR0015, PR0016
+- Status: Deferred (replanned into v0.3+ tracks)
 
 ## M5 - v0.2 Workspace Foundation
 

@@ -1,112 +1,194 @@
-﻿# Data Model
+# Data Model
 
 ## Purpose
 
-This document defines the canonical v0.1 data model used by LazyNote core.
+This document defines the canonical data model used by LazyNote core, covering v0.1 through v0.1.5.
 
 ## Canonical Entity: Atom
 
-`Atom` is the single storage shape for note/task/event projections.
+`Atom` is the single storage shape for all projections (note/task/event). There are no separate entity tables. All data lives in `atoms`.
 
-Current fields (implemented):
+### Fields
 
-- `uuid` (stable ID)
-- `type` (`note | task | event`)
-- `content` (text/markdown body)
-- `task_status` (`todo | in_progress | done | cancelled`, optional)
-- `event_start` (epoch ms, optional)
-- `event_end` (epoch ms, optional)
-- `hlc_timestamp` (reserved)
-- `is_deleted` (`0 | 1` soft delete)
-- `created_at` (epoch ms)
-- `updated_at` (epoch ms)
+| Field | Type | Nullable | Description |
+|-------|------|----------|-------------|
+| `uuid` | TEXT | NO | Stable UUIDv4, never reused |
+| `type` | TEXT | NO | Rendering hint: `note \| task \| event`. Determines UI form, not list classification. |
+| `content` | TEXT | NO | Markdown body |
+| `task_status` | TEXT | YES | `todo \| in_progress \| done \| cancelled`. Applies to all atom types. NULL = no status (note-like). |
+| `start_at` | INTEGER | YES | Epoch ms. Meaning depends on time-matrix quadrant. |
+| `end_at` | INTEGER | YES | Epoch ms. Meaning depends on time-matrix quadrant. |
+| `recurrence_rule` | TEXT | YES | Reserved — RFC 5545 RRULE string (e.g. `FREQ=WEEKLY`). **v0.1.5: always NULL, no logic.** |
+| `preview_text` | TEXT | YES | Derived first non-empty text line |
+| `preview_image` | TEXT | YES | Derived first markdown image path |
+| `hlc_timestamp` | TEXT | YES | Reserved for CRDT/HLC merge logic |
+| `is_deleted` | INTEGER | NO | `0 \| 1` soft-delete flag |
+| `created_at` | INTEGER | NO | Epoch ms |
+| `updated_at` | INTEGER | NO | Epoch ms |
 
 Code reference: `crates/lazynote_core/src/model/atom.rs`.
 
+---
+
+## Atom Time-Matrix (v0.1.5+)
+
+Classification for list views is **driven entirely by `start_at`/`end_at` nullability** — not by the `type` field.
+
+| start_at | end_at | Semantic | UI rendering | Default section |
+|----------|--------|----------|--------------|----------------|
+| NULL | NULL | Pure note / idea (Timeless) | Plain text | **Inbox** |
+| NULL | Value | DDL task — "complete before end_at" | Checkbox + countdown | **Today** (if end_at ≤ today) or **Upcoming** |
+| Value | NULL | Ongoing task — "started at start_at, no deadline" | Checkbox + elapsed time | **Today** (if start_at ≤ today) or **Upcoming** |
+| Value | Value | Timed event / time block | Time range bar | **Today** (if overlaps today) or **Upcoming** |
+
+**Rule**: `type` decides shape; time-matrix decides position. These two axes are independent.
+
+---
+
+## Section Query Logic
+
+Let `BOD` = today 00:00:00 (device local, epoch ms), `EOD` = today 23:59:59.
+
+Atoms with `task_status IN ('done', 'cancelled')` are excluded from all sections.
+
+### Inbox
+
+```sql
+WHERE start_at IS NULL
+  AND end_at IS NULL
+  AND (task_status IS NULL OR task_status NOT IN ('done', 'cancelled'))
+  AND is_deleted = 0
+ORDER BY updated_at DESC, uuid ASC
+```
+
+### Today
+
+Any atom "active today" — three OR conditions:
+
+```sql
+WHERE is_deleted = 0
+  AND (task_status IS NULL OR task_status NOT IN ('done', 'cancelled'))
+  AND (
+    -- DDL overdue or due today [NULL, Value]
+    (end_at IS NOT NULL AND end_at <= :eod AND start_at IS NULL)
+    -- Ongoing task already started [Value, NULL]
+    OR (start_at IS NOT NULL AND end_at IS NULL AND start_at <= :eod)
+    -- Event overlapping today [Value, Value]
+    OR (start_at IS NOT NULL AND end_at IS NOT NULL
+        AND start_at <= :eod AND end_at >= :bod)
+  )
+ORDER BY COALESCE(start_at, end_at) ASC, updated_at DESC
+```
+
+### Upcoming
+
+Any atom anchored entirely in the future:
+
+```sql
+WHERE is_deleted = 0
+  AND (task_status IS NULL OR task_status NOT IN ('done', 'cancelled'))
+  AND (
+    -- Future DDL [NULL, Value]
+    (end_at IS NOT NULL AND end_at > :eod AND start_at IS NULL)
+    -- Future ongoing [Value, NULL]
+    OR (start_at IS NOT NULL AND end_at IS NULL AND start_at > :eod)
+    -- Future event [Value, Value]
+    OR (start_at IS NOT NULL AND end_at IS NOT NULL AND start_at > :eod)
+  )
+ORDER BY COALESCE(start_at, end_at) ASC, updated_at DESC
+```
+
+---
+
 ## Invariants
 
-Mandatory invariants in v0.1:
+1. `uuid` is stable, never nil, never reused.
+2. `end_at >= start_at` when both are non-null.
+3. `is_deleted` is the source of truth for visibility lifecycle.
+4. `recurrence_rule` must be NULL or a valid RFC 5545 RRULE string (enforced when logic is activated in v0.2+).
 
-1. `uuid` is stable and never reused.
-2. `uuid` must not be nil.
-3. `event_end >= event_start` when both exist.
-4. `is_deleted` is the source of truth for visibility lifecycle.
+Enforcement: `Atom::validate()`, DB `CHECK` constraints, repository write boundaries.
 
-Enforcement points:
-
-- model validation (`Atom::validate`)
-- DB schema `CHECK` constraints
-- repository/service write boundaries
+---
 
 ## Projection Strategy
 
-UI projections map from the same atom record:
+The `type` field drives UI rendering only:
 
-- Note projection: `type = note`
-- Task projection: `type = task`
-- Event projection: `type = event`
+- `type = 'note'`: plain text display
+- `type = 'task'`: checkbox, status indicator
+- `type = 'event'`: time range bar, calendar slot
 
-No data copying across separate entity tables for note/task/event.
+List section membership (Inbox/Today/Upcoming) is derived from time fields, not `type`.
 
-## Relational Schema (v0.1)
+---
 
-Implemented tables:
+## Relational Schema
 
-- `atoms`
-- `tags`
-- `atom_tags`
-- `external_mappings`
-- `atoms_fts` (FTS5 virtual table)
+| Migration | File | Change |
+|-----------|------|--------|
+| 1 | `0001_init.sql` | `atoms` table with `type`, content, timestamps, soft-delete |
+| 2 | `0002_tags.sql` | `tags`, `atom_tags` junction |
+| 3 | `0003_external_mappings.sql` | `external_mappings` for sync linkage |
+| 4 | `0004_fts.sql` | `atoms_fts` FTS5 virtual table + sync triggers |
+| 5 | `0005_note_preview.sql` | `preview_text`, `preview_image` columns |
+| 6 | `0006_time_matrix.sql` | Rename `event_start`→`start_at`, `event_end`→`end_at`; add `recurrence_rule TEXT` |
 
-Migration files:
-
-- `crates/lazynote_core/src/db/migrations/0001_init.sql`
-- `crates/lazynote_core/src/db/migrations/0002_tags.sql`
-- `crates/lazynote_core/src/db/migrations/0003_external_mappings.sql`
-- `crates/lazynote_core/src/db/migrations/0004_fts.sql`
-
-## ID Policy
-
-- Primary ID type: UUID string.
-- ID generation: Rust core.
-- FFI/UI must treat IDs as opaque stable identifiers.
-
-## Deletion Policy
-
-- v0.1 default: soft delete only (`is_deleted = 1`).
-- Search and default list APIs exclude deleted rows.
-- Hard delete is out of scope for v0.1 feature flow.
-
-## External Mapping Model
-
-`external_mappings` provides provider linkage for future sync:
-
-- `provider`
-- `external_id`
-- `atom_uuid`
-- `external_version`
-- `last_synced_at`
-
-Uniqueness:
-
-- unique (`provider`, `external_id`)
-- unique (`provider`, `atom_uuid`)
+---
 
 ## Search Model
 
 FTS index behavior:
 
-- indexes `content` from non-deleted atoms
-- maintained via triggers on insert/update/delete
-- rank + deterministic tie-break (`updated_at DESC`, `uuid ASC`)
+- Indexes `content` from all non-deleted atoms regardless of `type`.
+- Search results include notes, tasks, and events in a unified result set.
+- Frontend uses `type` to render result rows differently (checkbox badge, time badge, etc.).
+- Rank + deterministic tie-break: `updated_at DESC, uuid ASC`.
 
 Code reference: `crates/lazynote_core/src/search/fts.rs`.
 
-## Known Risks / Deferred Work
+---
 
-- `Atom` fields are currently public for iteration speed.
-- v0.2 target: move to stricter typed mutation paths/private fields.
-- `hlc_timestamp` is reserved; CRDT/HLC merge logic is not implemented in v0.1.
+## ID Policy
+
+- Primary ID: UUID string, generated in Rust Core.
+- FFI and UI treat IDs as opaque stable identifiers.
+
+---
+
+## Deletion Policy
+
+- Business-path deletion: soft-delete only (`is_deleted = 1`).
+- Search and list APIs exclude `is_deleted = 1` rows.
+- Maintenance/purge hard-delete requires an ADR (see `engineering-standards.md` Rule C).
+
+---
+
+## External Mapping Model
+
+`external_mappings` provides provider linkage for future sync:
+
+| Column | Description |
+|--------|-------------|
+| `provider` | Sync provider name (e.g. `google_calendar`) |
+| `external_id` | Provider-side ID |
+| `atom_uuid` | Foreign key to `atoms.uuid` |
+| `external_version` | Provider version/etag |
+| `last_synced_at` | Epoch ms of last sync |
+
+Uniqueness constraints: `(provider, external_id)` and `(provider, atom_uuid)`.
+
+---
+
+## Known Deferred Work
+
+| Item | Target |
+|------|--------|
+| `Atom` fields currently public | v0.2: privatize fields, use typed mutation paths |
+| `hlc_timestamp` reserved | Future: CRDT/HLC merge logic |
+| `recurrence_rule` field added | v0.2+: RRULE calculation engine (Rust `rrule` crate) |
+
+---
 
 ## References
 
@@ -114,3 +196,4 @@ Code reference: `crates/lazynote_core/src/search/fts.rs`.
 - `docs/releases/v0.1/prs/PR-0005-sqlite-schema-migrations.md`
 - `docs/releases/v0.1/prs/PR-0006-core-crud.md`
 - `docs/releases/v0.1/prs/PR-0007-fts5-search.md`
+- `docs/releases/v0.1.5/README.md`

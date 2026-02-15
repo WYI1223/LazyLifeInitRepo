@@ -75,7 +75,7 @@ crates/
   lazynote_core/                 # All business logic (Rust)
     src/
       model/atom.rs              # Canonical Atom entity
-      db/                        # SQLite bootstrap + migrations (5 versions)
+      db/                        # SQLite bootstrap + versioned migrations
       repo/                      # Persistence traits + SQLite implementations
       service/                   # Use-case orchestration (NoteService, AtomService)
       search/fts.rs              # FTS5 full-text search
@@ -97,23 +97,24 @@ scripts/                         # doctor.ps1, gen_bindings.ps1, format.ps1
 
 LazyNote unifies notes, tasks, and events into a single canonical entity: **Atom**.
 
-The same record can be projected as a note, task, or event depending on its `type` field and metadata. There is no data duplication across entity types.
+The same record can be projected as a note, task, or event. `kind` drives UI rendering shape only; list section membership (Inbox/Today/Upcoming) is determined by `start_at`/`end_at` nullability — not by `kind`. There is no data duplication across entity types.
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `uuid` | UUIDv4 | Stable global identifier, never reused |
-| `kind` | `note \| task \| event` | Projection type |
+| `kind` | `note \| task \| event` | Rendering hint only — does not drive section classification |
 | `content` | String | Markdown body |
 | `preview_text` | String? | Derived from content (first plain text) |
-| `task_status` | Enum? | `todo \| in_progress \| done \| cancelled` |
-| `event_start` | i64? | Epoch milliseconds |
-| `event_end` | i64? | Epoch milliseconds; always ≥ `event_start` |
+| `task_status` | Enum? | `todo \| in_progress \| done \| cancelled`; NULL = no status |
+| `start_at` | i64? | Epoch ms — time-matrix anchor (Migration 6, v0.1.5) |
+| `end_at` | i64? | Epoch ms; always ≥ `start_at` (Migration 6, v0.1.5) |
+| `recurrence_rule` | String? | Reserved RFC 5545 RRULE string — NULL until v0.2+ |
 | `is_deleted` | bool | Soft-delete tombstone — authoritative for visibility |
 | `hlc_timestamp` | String? | Reserved for CRDT sync (not yet active) |
 
 **Invariants enforced in code:**
 - `uuid` is never nil
-- `event_end >= event_start` when both are set
+- `end_at >= start_at` when both are set
 - All default queries filter `WHERE is_deleted = 0`
 - Deletion is soft-delete only — `DELETE` statements on `atoms` are prohibited
 
@@ -132,7 +133,7 @@ The same record can be projected as a note, task, or event depending on its `typ
 | Note editor (Markdown) | Implemented |
 | Structured logging + diagnostics panel | Implemented |
 | Windows build | Implemented |
-| Tasks engine | Planned (post-v0.1) |
+| Tasks engine (Atom Time-Matrix, Inbox/Today/Upcoming) | Planned (v0.1.5 — PR-0011) |
 | Calendar engine | Planned (post-v0.1) |
 | Google Calendar sync | Planned (post-v0.1) |
 | Import / export | Planned (post-v0.1) |
@@ -207,12 +208,13 @@ On Windows, LazyNote stores all runtime files under `%APPDATA%\LazyLife\`:
 
 | Phase | Focus |
 |-------|-------|
-| **v0.1** (current) | Notes + tags + full-text search + single-entry panel |
+| **v0.1** (closing) | Notes + tags + full-text search + single-entry panel |
+| **v0.1.5** | Atom Time-Matrix — Inbox/Today/Upcoming task views (PR-0011) |
 | **v0.2** | Global hotkey, notes tree (hierarchy), split-pane layout |
 | **v0.3** | Advanced layout, drag-to-split, cross-pane sync |
 | **v1.0** | Plugin sandbox, iOS distribution, API compat CI gates |
 
-Post-v0.1 planned: tasks, calendar, Google Calendar sync, import/export, mobile.
+v0.1.5: tasks + time-matrix (PR-0011). Post-v0.1.5: calendar, Google Calendar sync, import/export, mobile.
 
 ---
 

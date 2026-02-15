@@ -26,11 +26,22 @@ Out of scope:
 - recurring reminder engine
 - snooze/advanced notification actions
 
+## Architecture Note (Atom Time-Matrix, v0.1.5+)
+
+Reminder trigger time is derived from atom time-matrix fields, not from `kind`:
+
+- `[NULL, Value]` DDL task: remind before `end_at` (e.g., 15 min before deadline).
+- `[Value, NULL]` Ongoing task: remind at `start_at` (task is starting).
+- `[Value, Value]` Event: remind before `start_at` (event is starting).
+- `[NULL, NULL]` Timeless atom: no time-based reminder applicable.
+
+Idempotency key = `atom_id` + trigger timestamp to avoid duplicate notifications.
+
 ## Step-by-Step
 
 1. Choose and lock Windows notification plugin/runtime path.
 2. Add reminder scheduler abstraction in Flutter.
-3. Add task/calendar integration points for create/update/delete.
+3. Add task/calendar integration points keyed on `start_at`/`end_at`.
 4. Ensure idempotent scheduling keys (avoid duplicates).
 5. Add unit tests for schedule/cancel behavior.
 6. Add smoke path validation for Windows runtime.

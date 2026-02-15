@@ -121,22 +121,36 @@ These are hard constraints enforced across the codebase:
 ```rust
 pub struct Atom {
     pub uuid: AtomId,                        // UUIDv4, stable, never reused
-    pub kind: AtomType,                      // Note | Task | Event
+    pub kind: AtomType,                      // Note | Task | Event — rendering hint only
     pub content: String,                     // Markdown body
     pub preview_text: Option<String>,        // Derived from content (first non-empty text)
     pub preview_image: Option<String>,       // First markdown image path
-    pub task_status: Option<TaskStatus>,     // Todo | InProgress | Done | Cancelled
-    pub event_start: Option<i64>,            // Epoch ms
-    pub event_end: Option<i64>,              // Epoch ms; event_end >= event_start
+    pub task_status: Option<TaskStatus>,     // Todo | InProgress | Done | Cancelled; NULL = no status
+    pub start_at: Option<i64>,              // Epoch ms (added in Migration 6)
+    pub end_at: Option<i64>,                // Epoch ms; end_at >= start_at when both set (Migration 6)
+    pub recurrence_rule: Option<String>,    // Reserved: RFC 5545 RRULE string; NULL until v0.2+
     pub hlc_timestamp: Option<String>,       // Reserved for CRDT (not yet used)
     pub is_deleted: bool,                    // Authoritative soft-delete flag
 }
 ```
 
+**Atom Time-Matrix** — list section is derived from `start_at`/`end_at` nullability, NOT from `kind`:
+
+| start_at | end_at | Semantic | Section |
+|----------|--------|----------|---------|
+| NULL | NULL | Pure note / idea | Inbox |
+| NULL | Value | DDL task (deadline = end_at) | Today if overdue/today, else Upcoming |
+| Value | NULL | Ongoing task (started = start_at) | Today if started, else Upcoming |
+| Value | Value | Timed event / time block | Today if overlaps today, else Upcoming |
+
+`kind` determines rendering shape (checkbox / text / time bar). `task_status IN ('done','cancelled')` hides the atom from all sections.
+
 **Invariants** (enforced by `Atom::validate()`):
 - `uuid` is never nil
-- `event_end >= event_start` when both are set
+- `end_at >= start_at` when both are set
 - All default queries filter `WHERE is_deleted = 0`
+
+Full section SQL is in `docs/architecture/data-model.md`.
 
 ---
 
@@ -151,6 +165,7 @@ pub struct Atom {
 | 3 | `0003_external_mappings.sql` | `external_mappings` (provider, external_id, atom_uuid) |
 | 4 | `0004_fts.sql` | `atoms_fts` FTS5 virtual table + sync triggers |
 | 5 | `0005_note_preview.sql` | `preview_text`, `preview_image` columns on `atoms` |
+| 6 | `0006_time_matrix.sql` | Rename `event_start`→`start_at`, `event_end`→`end_at`; add `recurrence_rule TEXT` (reserved) |
 
 **Never** modify existing migrations after they are applied to any user database. Add a new numbered SQL file for schema changes. (Pre-v1.0 squash is allowed with documented process — see Adding a Database Migration.)
 
@@ -307,3 +322,5 @@ All path resolution is in `apps/lazynote_flutter/lib/core/local_paths.dart`.
 - **Tags are lowercased** by the repo layer; pass normalized lowercase tags from the service layer too.
 - **`notes_list` sort order**: `updated_at DESC, uuid ASC` — do not change this without updating the contract doc.
 - **Single-entry input parsing** lives in `lib/features/entry/command_parser.dart` (Flutter), not in Rust Core. This is intentional for v0.1 UX iteration speed.
+- **`event_start`/`event_end` are renamed** to `start_at`/`end_at` in Migration 6 (v0.1.5). Do not reference the old column names in new code.
+- **Section classification uses time fields, not `AtomType`**. `kind`/`type` is a rendering hint only. See `docs/architecture/data-model.md` for section SQL.

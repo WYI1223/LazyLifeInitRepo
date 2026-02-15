@@ -7,11 +7,23 @@
 
 Implement provider-agnostic local task-calendar projection as core capability.
 
+## Architecture Note (Atom Time-Matrix)
+
+Under the unified Atom model, calendar blocks are atoms with `start_at`/`end_at` set.
+There is no separate entity for "calendar blocks":
+
+- A `calendar_projection` table is only justified for caching pre-expanded recurrence
+  instances (e.g., RRULE expansion for weekly/monthly repeating atoms). This requires
+  an explicit ADR before adding any migration.
+- Without RRULE expansion, all calendar queries should read from the `atoms` table
+  directly, using `start_at`/`end_at` for time-window filtering.
+- Status propagation (`done`/`cancelled`) is handled by the existing section filter.
+
 ## Scope (v0.3)
 
 In scope:
 
-- projection between task model and local calendar blocks
+- time-window query rules for calendar view (powered by `start_at`/`end_at` on atoms)
 - status propagation (`todo/in_progress/done/cancelled`) to calendar representation
 - local conflict rules and deterministic tie-breakers
 - query/update APIs for calendar-focused views

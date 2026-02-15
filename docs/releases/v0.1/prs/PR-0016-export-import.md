@@ -12,6 +12,30 @@ Provide baseline portability and local backup/restore.
 v0.1 has been narrowed to notes-first + diagnostics-readability closure (`PR-0010C2/C3/C4/D`, `PR-0017A`).
 This PR remains a post-v0.1 backlog candidate.
 
+## Architecture Note (Atom Time-Matrix, v0.1.5+)
+
+All import/export must map between external formats and the Atom time-matrix fields:
+
+**Markdown import (`[ ]` syntax):**
+- `- [ ] content` → `kind = task`, `task_status = 'todo'`, no time fields (Inbox).
+- `- [x] content` → `kind = task`, `task_status = 'done'`.
+- Time expressions in content are **not** auto-parsed to `end_at` in v0.1.5; they remain
+  as raw text. Automated time extraction is deferred to v0.2+.
+
+**ICS export mapping (atoms → iCalendar):**
+- `[Value, Value]` → `VEVENT` (DTSTART = `start_at`, DTEND = `end_at`)
+- `[NULL, Value]` → `VTODO` with `DUE = end_at`
+- `[Value, NULL]` → `VTODO` with `DTSTART = start_at`, no DUE
+- `[NULL, NULL]` → `VTODO` with no time fields, or excluded from ICS output
+
+**ICS import mapping (iCalendar → atoms):**
+- `VEVENT` → `kind = event`, `start_at = DTSTART`, `end_at = DTEND`
+- `VTODO` with `DUE` → `kind = task`, `end_at = DUE`, `start_at = NULL`
+- `VTODO` with `DTSTART` only → `kind = task`, `start_at = DTSTART`, `end_at = NULL`
+- `STATUS:COMPLETED` → `task_status = 'done'`; `STATUS:CANCELLED` → `task_status = 'cancelled'`
+
+Finalize and document these mappings in `docs/api/ffi-contracts.md` before implementation.
+
 ## Scope (post-v0.1 backlog)
 
 In scope:

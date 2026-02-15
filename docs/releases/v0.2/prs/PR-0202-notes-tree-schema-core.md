@@ -52,7 +52,7 @@ Invariants:
 
 ## Planned File Changes
 
-- [add] `crates/lazynote_core/src/db/migrations/0006_workspace_tree.sql`
+- [add] `crates/lazynote_core/src/db/migrations/0007_workspace_tree.sql`
 - [edit] `crates/lazynote_core/src/db/migrations/mod.rs`
 - [add] `crates/lazynote_core/src/repo/tree_repo.rs`
 - [edit] `crates/lazynote_core/src/repo/mod.rs`

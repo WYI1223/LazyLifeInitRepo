@@ -62,18 +62,14 @@ v0.1 is considered complete when:
 
 - Completed:
   - PR-0000 to PR-0009D
-  - PR-0010A, PR-0010B, PR-0010C1
+  - PR-0010A, PR-0010B, PR-0010C1, PR-0010C2, PR-0010C3, PR-0010C4, PR-0010D
   - PR-0017, PR-0018
 - Remaining:
-  - PR-0010C2
-  - PR-0010C3
-  - PR-0010C4
-  - PR-0010D
   - PR-0017A
 
 ## Deferred Backlog (Post-v0.1)
 
-- `PR-0011` tasks views
+- `PR-0011` tasks views → **replanned to v0.1.5** (`docs/releases/v0.1.5/README.md`)
 - `PR-0012` calendar minimal
 - `PR-0013` reminders (Windows)
 - `PR-0014` local task-calendar projection baseline

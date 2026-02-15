@@ -75,7 +75,7 @@ crates/
   lazynote_core/                 # 全部业务逻辑（Rust）
     src/
       model/atom.rs              # 规范 Atom 实体
-      db/                        # SQLite 启动 + 迁移管理（5 个版本）
+      db/                        # SQLite 启动 + 版本化迁移管理
       repo/                      # 持久化 Trait + SQLite 实现
       service/                   # 用例编排（NoteService、AtomService）
       search/fts.rs              # FTS5 全文检索
@@ -97,23 +97,24 @@ scripts/                         # doctor.ps1、gen_bindings.ps1、format.ps1
 
 LazyNote 将笔记、任务、事件统一为同一个规范实体：**Atom**。
 
-同一条记录可根据 `type` 字段和元数据，在不同视图中投影为 Note / Task / Event，无需数据复制或迁移。
+同一条记录可投影为 Note / Task / Event。`kind` 字段仅决定 UI 渲染形状；列表区块归属（Inbox / Today / Upcoming）由 `start_at`/`end_at` 的可空性决定，与 `kind` 无关。无需数据复制或迁移。
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `uuid` | UUIDv4 | 全局稳定标识，绝不复用 |
-| `kind` | `note \| task \| event` | 投影类型 |
+| `kind` | `note \| task \| event` | 仅为渲染提示 — 不决定区块分类 |
 | `content` | String | Markdown 正文 |
 | `preview_text` | String? | 从 content 派生（首段纯文本） |
-| `task_status` | Enum? | `todo \| in_progress \| done \| cancelled` |
-| `event_start` | i64? | 毫秒级 Epoch 时间戳 |
-| `event_end` | i64? | 毫秒级 Epoch 时间戳；始终 ≥ `event_start` |
+| `task_status` | Enum? | `todo \| in_progress \| done \| cancelled`；NULL = 无状态 |
+| `start_at` | i64? | 毫秒级 Epoch 时间戳 — 时间矩阵锚点（Migration 6，v0.1.5） |
+| `end_at` | i64? | 毫秒级 Epoch 时间戳；始终 ≥ `start_at`（Migration 6，v0.1.5） |
+| `recurrence_rule` | String? | 保留字段：RFC 5545 RRULE 字符串 — v0.2+ 前均为 NULL |
 | `is_deleted` | bool | 软删除标记 — 对可见性具有权威性 |
 | `hlc_timestamp` | String? | 为 CRDT 同步预留（暂未启用） |
 
 **代码层强制执行的不变量：**
 - `uuid` 永不为空
-- 当 `event_start` 与 `event_end` 均存在时，`event_end >= event_start`
+- 当 `start_at` 与 `end_at` 均存在时，`end_at >= start_at`
 - 所有默认查询过滤 `WHERE is_deleted = 0`
 - 仅允许软删除 — 禁止对 `atoms` 执行 `DELETE` 语句
 
@@ -132,7 +133,7 @@ LazyNote 将笔记、任务、事件统一为同一个规范实体：**Atom**。
 | 笔记编辑器（Markdown） | 已实现 |
 | 结构化日志 + 诊断面板 | 已实现 |
 | Windows 构建 | 已实现 |
-| 任务引擎 | 计划中（post-v0.1） |
+| 任务引擎（Atom 时间矩阵，Inbox/Today/Upcoming） | 计划中（v0.1.5 — PR-0011） |
 | 日历引擎 | 计划中（post-v0.1） |
 | Google Calendar 同步 | 计划中（post-v0.1） |
 | 导入 / 导出 | 计划中（post-v0.1） |
@@ -207,12 +208,13 @@ Windows 下，LazyNote 的所有运行时文件存储在 `%APPDATA%\LazyLife\`�
 
 | 阶段 | 重点 |
 |------|------|
-| **v0.1**（当前） | 笔记 + 标签 + 全文检索 + 单一入口面板 |
+| **v0.1**（收尾中） | 笔记 + 标签 + 全文检索 + 单一入口面板 |
+| **v0.1.5** | Atom 时间矩阵 — Inbox/Today/Upcoming 任务视图（PR-0011） |
 | **v0.2** | 全局快捷键、笔记树（层级结构）、分屏布局 |
 | **v0.3** | 高级布局、拖拽分屏、跨面板实时同步 |
 | **v1.0** | 插件沙箱、iOS 发布、API 兼容性 CI 门控 |
 
-post-v0.1 计划：任务引擎、日历引擎、Google Calendar 同步、导入/导出、移动端。
+v0.1.5：任务引擎 + 时间矩阵（PR-0011）。v0.1.5 后：日历引擎、Google Calendar 同步、导入/导出、移动端。
 
 ---
 

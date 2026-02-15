@@ -6,6 +6,11 @@
    - scope: close local notes loop + debug viewer readability baseline
    - focus PRs: `PR-0010C2`, `PR-0010C3`, `PR-0010C4`, `PR-0010D`, `PR-0017A`
    - plan: `docs/releases/v0.1/README.md`
+1.5. v0.1.5 (Atom Time-Matrix bridge)
+   - scope: time-matrix schema (Migration 6) + Inbox/Today/Upcoming task views
+   - focus PRs: `PR-0011`
+   - plan: `docs/releases/v0.1.5/README.md`
+   - gate: v0.1 (PR-0017A) must close before v0.1.5 begins
 2. v0.2 (workspace foundation)
    - scope: tree model, workspace provider, explorer recursion, split v1, extension kernel contracts (command/parser/provider/ui slot/capability), CN/EN i18n, debug viewer phase-2 readability hardening, docs language policy, links v1
    - focus PRs: `PR-0201` to `PR-0218`
@@ -21,9 +26,7 @@
 
 ## Deferred from v0.1
 
-Moved to post-v0.1 planning tracks:
-
-- `PR-0011` tasks views
+- `PR-0011` tasks views → **replanned to v0.1.5** (Atom Time-Matrix, PR-0011)
 - `PR-0012` calendar minimal
 - `PR-0013` reminders (Windows)
 - `PR-0014` local task-calendar projection baseline

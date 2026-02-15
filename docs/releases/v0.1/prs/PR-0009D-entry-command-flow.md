@@ -68,8 +68,8 @@ Out of scope:
 1. `> new note <content>` creates `AtomType::Note`.
 2. `> task <content>` creates `AtomType::Task` with `task_status = todo`.
 3. `> schedule <date_spec> <title>` creates `AtomType::Event`:
-   - point: `event_start` set, `event_end = null`
-   - range: `event_start` and `event_end` set
+   - point: `event_start` set, `event_end = null` _(renamed to `start_at`/`end_at` in Migration 6, v0.1.5)_
+   - range: `event_start` and `event_end` set _(renamed to `start_at`/`end_at` in Migration 6, v0.1.5)_
 
 Visual feedback baseline:
 
