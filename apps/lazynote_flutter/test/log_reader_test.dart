@@ -97,7 +97,9 @@ void main() {
   });
 
   test('readLatestTail discards incomplete trailing line', () async {
-    final tempDir = await Directory.systemTemp.createTemp('lazynote-log-guard-');
+    final tempDir = await Directory.systemTemp.createTemp(
+      'lazynote-log-guard-',
+    );
     addTearDown(() async {
       if (await tempDir.exists()) {
         await tempDir.delete(recursive: true);
@@ -111,32 +113,35 @@ void main() {
 
     LogReader.logDirPathResolver = () async => tempDir.path;
     // Simulate a mid-write read: last line has no trailing newline.
-    LogReader.fileReader =
-        (File file) async => 'line1\nline2\nincomplete_partial';
+    LogReader.fileReader = (File file) async =>
+        'line1\nline2\nincomplete_partial';
 
     final snapshot = await LogReader.readLatestTail(maxLines: 200);
     expect(snapshot.tailText, equals('line1\nline2'));
     expect(snapshot.tailText, isNot(contains('incomplete_partial')));
   });
 
-  test('readLatestTail keeps last line when content ends with newline', () async {
-    final tempDir = await Directory.systemTemp.createTemp('lazynote-log-nl-');
-    addTearDown(() async {
-      if (await tempDir.exists()) {
-        await tempDir.delete(recursive: true);
-      }
-    });
+  test(
+    'readLatestTail keeps last line when content ends with newline',
+    () async {
+      final tempDir = await Directory.systemTemp.createTemp('lazynote-log-nl-');
+      addTearDown(() async {
+        if (await tempDir.exists()) {
+          await tempDir.delete(recursive: true);
+        }
+      });
 
-    final logFile = File(
-      '${tempDir.path}${Platform.pathSeparator}lazynote-nl.log',
-    );
-    await logFile.writeAsString('placeholder');
+      final logFile = File(
+        '${tempDir.path}${Platform.pathSeparator}lazynote-nl.log',
+      );
+      await logFile.writeAsString('placeholder');
 
-    LogReader.logDirPathResolver = () async => tempDir.path;
-    // Properly terminated content — last line must be kept.
-    LogReader.fileReader = (File file) async => 'line1\nline2\n';
+      LogReader.logDirPathResolver = () async => tempDir.path;
+      // Properly terminated content — last line must be kept.
+      LogReader.fileReader = (File file) async => 'line1\nline2\n';
 
-    final snapshot = await LogReader.readLatestTail(maxLines: 200);
-    expect(snapshot.tailText, equals('line1\nline2'));
-  });
+      final snapshot = await LogReader.readLatestTail(maxLines: 200);
+      expect(snapshot.tailText, equals('line1\nline2'));
+    },
+  );
 }
