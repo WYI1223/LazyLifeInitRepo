@@ -15,7 +15,7 @@ This document defines the canonical data model used by LazyNote core, covering v
 | `uuid` | TEXT | NO | Stable UUIDv4, never reused |
 | `type` | TEXT | NO | Rendering hint: `note \| task \| event`. Determines UI form, not list classification. |
 | `content` | TEXT | NO | Markdown body |
-| `task_status` | TEXT | YES | `todo \| in_progress \| done \| cancelled`. Applies to all atom types. NULL = no status (note-like). |
+| `task_status` | TEXT | YES | `todo \| in_progress \| done \| cancelled`. Applies to all atom types (universal completion). NULL = no status (statusless / note-like). Setting to `null` demotes the atom. |
 | `start_at` | INTEGER | YES | Epoch ms. Meaning depends on time-matrix quadrant. |
 | `end_at` | INTEGER | YES | Epoch ms. Meaning depends on time-matrix quadrant. |
 | `recurrence_rule` | TEXT | YES | Reserved — RFC 5545 RRULE string (e.g. `FREQ=WEEKLY`). **v0.1.5: always NULL, no logic.** |

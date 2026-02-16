@@ -71,8 +71,8 @@ Execution note:
 
 ## Deferred Backlog (Post-v0.1)
 
-- `PR-0011` tasks views
-- `PR-0012` calendar minimal
+- `PR-0011` tasks views ✅ (v0.1.5)
+- `PR-0012` calendar minimal ✅ (post-v0.1.5)
 - `PR-0013` reminders (Windows)
 - `PR-0014` local task-calendar projection baseline
 - `PR-0015` Google Calendar provider plugin track

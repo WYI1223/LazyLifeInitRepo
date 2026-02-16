@@ -46,6 +46,29 @@ Producer: `apps/lazynote_flutter/lib/features/entry/command_parser.dart`
 | `schedule_datetime_invalid` | date/time parse failed | invalid date/time values | parse error state |
 | `schedule_range_invalid` | range end is not after start | `10:45-09:30` | parse error state |
 
+## Tasks/Status (FFI) — v0.1.5
+
+Producer: `crates/lazynote_ffi/src/api.rs`
+
+| Code | Meaning | Typical Cause | UI Handling |
+| --- | --- | --- | --- |
+| `invalid_atom_id` | atom id format invalid | non-UUID `atom_id` | show validation error |
+| `atom_not_found` | target atom missing | stale/deleted id | show not-found state and refresh list |
+| `invalid_status` | status value not in allowed set | typo or unsupported status string | show validation error |
+| `db_error` | repository/database failure | sqlite/schema/io issue | show error and allow retry |
+| `internal_error` | unexpected invariant failure | read-back mismatch or unexpected state | show error and allow retry |
+
+## Calendar (FFI) — PR-0012A
+
+Producer: `crates/lazynote_ffi/src/api.rs`
+
+| Code | Meaning | Typical Cause | UI Handling |
+| --- | --- | --- | --- |
+| `invalid_time_range` | end_at < start_at in event time update | reversed time range input | show validation error |
+| `invalid_atom_id` | atom id format invalid | non-UUID `atom_id` | show validation error |
+| `atom_not_found` | target atom missing | stale/deleted id | show not-found state and refresh |
+| `db_error` | repository/database failure | sqlite/schema/io issue | show error and allow retry |
+
 ## Reserved Pattern
 
 - Use lowercase snake case.

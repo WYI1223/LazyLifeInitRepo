@@ -43,3 +43,36 @@ Fast iteration is allowed; silent API drift is not.
 
 Stability guarantee starts at **v1.0**: from v1.0 onward, all changes to public API surfaces are subject
 to the full breaking-change process above, including migration guidance and release note updates.
+
+## Planned Type Migrations
+
+### `AtomListResponse` / `AtomListItem` (v0.1.5 → v0.2)
+
+v0.1.5 introduces `AtomListItem` and `AtomListResponse` for tasks section queries. These types
+carry full atom metadata (`kind`, `start_at`, `end_at`, `task_status`) that the existing
+`EntryListItem` / `NoteItem` types do not.
+
+**Coexistence plan (v0.1.5):**
+- New tasks APIs use `AtomListResponse` / `AtomListItem`.
+- Existing notes APIs continue to use `NoteItem` / `NotesListResponse`.
+- Both type families are available simultaneously.
+
+**Migration plan (v0.2):**
+- `notes_list` migrates from `NotesListResponse` to `AtomListResponse`.
+- `tags_list` response is evaluated for unification.
+- Old types are deprecated but not removed until v1.0.
+- Migration rationale: unified list views in workspace UI need consistent item shape.
+
+This is a **non-breaking additive change** in v0.1.5 (new types only). The v0.2 migration
+of existing endpoints will be documented as a breaking change with migration guidance.
+
+### Calendar APIs (PR-0012A)
+
+Two new FFI functions added as **non-breaking additive changes**:
+
+- `calendar_list_by_range(start_ms, end_ms, limit?, offset?) -> AtomListResponse`
+- `calendar_update_event(atom_id, start_ms, end_ms) -> EntryActionResponse`
+
+Both reuse existing response types (`AtomListResponse`, `EntryActionResponse`).
+
+New error code: `invalid_time_range` — additive, no impact on existing callers.

@@ -65,3 +65,118 @@ Producer: `crates/lazynote_ffi/src/api.rs`
 - `internal_error`
 
 See full registry: `docs/api/error-codes.md`.
+
+---
+
+## Tasks/Status APIs (PR-0011A, v0.1.5)
+
+All APIs are use-case level and async.
+
+### New Response Types
+
+**`AtomListItem`** — full atom projection for section queries:
+
+- `atom_id: String` — stable UUID
+- `kind: String` — `"note"` | `"task"` | `"event"` (rendering hint)
+- `content: String` — markdown body
+- `preview_text: String?` — derived plain-text summary
+- `preview_image: String?` — derived first image path
+- `tags: Vec<String>` — normalized lowercase tags
+- `start_at: i64?` — epoch ms
+- `end_at: i64?` — epoch ms
+- `task_status: String?` — `"todo"` | `"in_progress"` | `"done"` | `"cancelled"` | null
+- `updated_at: i64` — epoch ms
+
+**`AtomListResponse`** — envelope for section list queries:
+
+- `ok: bool` — execution success flag
+- `error_code: String?` — stable machine-readable error code
+- `items: Vec<AtomListItem>` — result list
+- `message: String` — human-readable status text
+- `total_count: u32?` — total matching records (before pagination)
+
+**Migration note**: `notes_list` and `tags_list` will migrate from `NoteItem`/`NotesListResponse`
+to `AtomListItem`/`AtomListResponse` in v0.2 when list views are unified. Both type families
+coexist until then.
+
+### Section Queries
+
+- `tasks_list_inbox() -> AtomListResponse`
+  - Returns atoms with `start_at IS NULL AND end_at IS NULL` and active status
+  - Order: `updated_at DESC, uuid ASC`
+
+- `tasks_list_today(bod_ms: i64, eod_ms: i64) -> AtomListResponse`
+  - `bod_ms`: beginning of today (00:00:00 local, epoch ms)
+  - `eod_ms`: end of today (23:59:59 local, epoch ms)
+  - Returns atoms active today per time-matrix logic
+  - Order: `COALESCE(start_at, end_at) ASC, updated_at DESC`
+
+- `tasks_list_upcoming(eod_ms: i64) -> AtomListResponse`
+  - `eod_ms`: end of today (lower bound for future atoms)
+  - Returns atoms entirely in the future
+  - Order: `COALESCE(start_at, end_at) ASC, updated_at DESC`
+
+Time parameters are computed by Flutter (device-local timezone). Rust Core does not
+compute device-local time.
+
+### Status Update
+
+- `atom_update_status(atom_id: String, status: Option<String>) -> EntryActionResponse`
+  - `status`: `"todo"` | `"in_progress"` | `"done"` | `"cancelled"` | `null`
+  - `null` clears `task_status` (demote to statusless atom)
+  - Idempotent: setting the same status twice is not an error
+  - Applies to any atom type (universal completion — see PR-0011 §D1)
+
+### Response Shape Rules
+
+Same rules as Notes/Tags:
+- Never require UI to parse free-text messages for branching.
+- Failure branch must carry stable `error_code`.
+- `message` is for diagnostics/display only.
+
+### Error Code Mapping (Tasks/Status)
+
+Producer: `crates/lazynote_ffi/src/api.rs`
+
+- `invalid_atom_id` — atom_id format invalid (non-UUID)
+- `atom_not_found` — target atom missing or soft-deleted
+- `invalid_status` — status string not in allowed set
+- `db_error` — repository/database failure
+- `internal_error` — unexpected invariant failure
+
+See full registry: `docs/api/error-codes.md`.
+
+---
+
+## Calendar APIs (PR-0012A)
+
+All APIs are use-case level and async.
+
+### Range Query
+
+- `calendar_list_by_range(start_ms: i64, end_ms: i64, limit?: u32, offset?: u32) -> AtomListResponse`
+  - Returns atoms with both `start_at` and `end_at` set that overlap the given time range
+  - Overlap condition: `start_at < end_ms AND end_at > start_ms`
+  - Includes all statuses (done/cancelled shown on calendar)
+  - Order: `start_at ASC, end_at ASC`
+  - Reuses `AtomListResponse` / `AtomListItem` types from tasks APIs
+  - Default limit: `50`, max: `50`
+
+### Event Time Update
+
+- `calendar_update_event(atom_id: String, start_ms: i64, end_ms: i64) -> EntryActionResponse`
+  - Updates only `start_at` and `end_at` for a calendar event
+  - Validates `end_ms >= start_ms`; returns `invalid_time_range` error code on failure
+  - Returns `atom_not_found` when target atom does not exist or is soft-deleted
+  - Does not modify content, tags, or task_status — time adjustment is an independent operation
+
+### Error Code Mapping (Calendar)
+
+Producer: `crates/lazynote_ffi/src/api.rs`
+
+- `invalid_time_range` — end_at < start_at in event time update
+- `invalid_atom_id` — atom_id format invalid (non-UUID)
+- `atom_not_found` — target atom missing or soft-deleted
+- `db_error` — repository/database failure
+
+See full registry: `docs/api/error-codes.md`.

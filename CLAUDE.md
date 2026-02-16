@@ -10,7 +10,7 @@
 **LazyNote** is a local-first personal productivity app (Windows-first MVP).
 Stack: **Flutter UI → Flutter-Rust Bridge (FRB) FFI → Rust Core → SQLite**.
 
-Current status: **v0.1 in development.** Notes + tags are functional. Tasks / calendar / sync are planned but not yet implemented.
+Current status: **Post-v0.1.5 (PR-0012 complete).** Notes + tags are functional. Tasks views (Inbox/Today/Upcoming) with status update are functional. Calendar minimal (weekly view + create/edit) is functional. Sync is planned but not yet implemented.
 
 ---
 
@@ -30,6 +30,7 @@ The single source of truth for domain rules, data models, persistence, and searc
 | `repo` | `src/repo/note_repo.rs` | Note-specific CRUD, tag normalization, `NoteRecord` DTO |
 | `service` | `src/service/atom_service.rs` | `AtomService<R>` — high-level atom creation façade |
 | `service` | `src/service/note_service.rs` | `NoteService` — note create/update/list, markdown preview derivation |
+| `service` | `src/service/task_service.rs` | `TaskService` — section queries (inbox/today/upcoming), status update |
 | `search` | `src/search/fts.rs` | FTS5 `search_all(query, conn)` returning `Vec<SearchHit>` |
 | `logging` | `src/logging.rs` | `flexi_logger` rolling-file logger; call `init_logging()` once at startup |
 
@@ -61,6 +62,8 @@ Flutter app. All data operations go through FFI calls. No state is stored outsid
 | `lib/features/notes/` | Note list, tab manager, editor, tag filter UI |
 | `lib/features/tags/` | `TagFilter` widget |
 | `lib/features/search/` | Search results view |
+| `lib/features/tasks/` | Tasks dashboard: Inbox/Today/Upcoming sections, status toggle, inline create |
+| `lib/features/calendar/` | Weekly calendar: mini month sidebar, week grid, event blocks, create/edit dialog |
 | `lib/features/diagnostics/` | Rust health panel + live log viewer |
 
 ---
@@ -156,7 +159,7 @@ Full section SQL is in `docs/architecture/data-model.md`.
 
 ## Database Schema
 
-5 migrations tracked via `PRAGMA user_version` in `crates/lazynote_core/src/db/migrations/`.
+6 migrations tracked via `PRAGMA user_version` in `crates/lazynote_core/src/db/migrations/`.
 
 | Version | File | Table(s) Added |
 |---------|------|----------------|
@@ -194,6 +197,15 @@ pub struct EntryListResponse {
     pub total_count: Option<u32>,
 }
 
+// Used by section list queries (tasks views)
+pub struct AtomListResponse {
+    pub ok: bool,
+    pub error_code: Option<String>,
+    pub items: Vec<AtomListItem>,       // Each: { atom_id, kind, content, preview_text, tags, start_at, end_at, task_status, updated_at }
+    pub message: String,
+    pub applied_limit: u32,
+}
+
 // Used by search
 pub struct EntrySearchResponse {
     pub ok: bool,
@@ -205,7 +217,8 @@ pub struct EntrySearchResponse {
 ```
 
 **Error codes** (from `docs/api/error-codes.md`):
-`invalid_note_id`, `invalid_tag`, `note_not_found`, `db_error`, `invalid_argument`, `internal_error`
+`invalid_note_id`, `invalid_tag`, `note_not_found`, `db_error`, `invalid_argument`, `internal_error`,
+`invalid_atom_id`, `atom_not_found`, `invalid_status`, `invalid_time_range`
 
 > **Stability note:** In v0.x, error codes and FFI contracts may change with documented rationale in the PR. Stability guarantees begin at v1.0.
 
@@ -226,8 +239,8 @@ pub struct EntrySearchResponse {
 |----------|---------|
 | `entry_search(text, limit?)` | `EntrySearchResponse` |
 | `entry_create_note(content)` | `EntryActionResponse` |
-| `entry_create_task(content)` | `EntryActionResponse` | **(stub — Tasks not yet implemented)** |
-| `entry_schedule(title, start, end?)` | `EntryActionResponse` | **(stub — Calendar not yet implemented)** |
+| `entry_create_task(content)` | `EntryActionResponse` |
+| `entry_schedule(title, start, end?)` | `EntryActionResponse` | Creates timed event atom |
 
 **Notes & Tags (async):**
 
@@ -242,6 +255,28 @@ pub struct EntrySearchResponse {
 
 **Pagination defaults:** `limit = 10`, `max = 50`.
 **Tag normalization:** Tags are lowercased and deduplicated. Single-tag filter only in v0.1.
+
+**Tasks & Status (async, v0.1.5):**
+
+| Function | Returns |
+|----------|---------|
+| `tasks_list_inbox(limit?, offset?)` | `AtomListResponse` |
+| `tasks_list_today(bod_ms, eod_ms, limit?, offset?)` | `AtomListResponse` |
+| `tasks_list_upcoming(eod_ms, limit?, offset?)` | `AtomListResponse` |
+| `atom_update_status(atom_id, status?)` | `EntryActionResponse` |
+
+**Section query defaults:** `limit = 50`. Time parameters (BOD/EOD) are epoch ms computed by Flutter.
+**Status values:** `"todo"`, `"in_progress"`, `"done"`, `"cancelled"`, `null` (clears status).
+
+**Calendar (async, PR-0012):**
+
+| Function | Returns |
+|----------|---------|
+| `calendar_list_by_range(start_ms, end_ms, limit?, offset?)` | `AtomListResponse` |
+| `calendar_update_event(atom_id, start_ms, end_ms)` | `EntryActionResponse` |
+
+**Calendar range query:** Returns atoms with both `start_at` and `end_at` set that overlap the given range. Includes all statuses. Default limit: `50`.
+**Event time update:** Validates `end_ms >= start_ms`. Returns `invalid_time_range` on failure.
 
 ---
 
@@ -304,6 +339,8 @@ All path resolution is in `apps/lazynote_flutter/lib/core/local_paths.dart`.
 | Error codes | `docs/api/error-codes.md` | Stable error code registry |
 | API compatibility | `docs/governance/API_COMPATIBILITY.md` | What counts as breaking |
 | v0.1 release plan | `docs/releases/v0.1/README.md` | PR roadmap & current status |
+| v0.1.5 release plan | `docs/releases/v0.1.5/README.md` | Time-matrix + tasks spec |
+| Calendar spec | `docs/releases/v0.1/prs/PR-0012-calendar-minimal.md` | Calendar minimal 4-sub-PR spec |
 | Windows quickstart | `docs/development/windows-quickstart.md` | Minimal dev setup |
 | Logging design | `docs/architecture/logging.md` | Structured log schema |
 | Settings config | `docs/architecture/settings-config.md` | App root, settings lifecycle |

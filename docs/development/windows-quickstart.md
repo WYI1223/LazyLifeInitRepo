@@ -35,6 +35,8 @@ Then run again:
 
 ```powershell
 cd apps/lazynote_flutter
+flutter clean
+flutter pub get
 flutter run -d windows
 ```
 
