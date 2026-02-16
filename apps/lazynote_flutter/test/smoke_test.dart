@@ -66,18 +66,30 @@ void main() {
     expect(find.byKey(const Key('notes_page_root')), findsNothing);
   });
 
-  testWidgets('tasks placeholder route is reachable from workbench', (
+  testWidgets('tasks route is reachable from workbench', (
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const LazyNoteApp());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
 
-    await tapWorkbenchButton(tester, 'Tasks (Placeholder)');
+    await tapWorkbenchButton(tester, 'Tasks');
 
+    expect(find.byKey(const Key('tasks_page_root')), findsOneWidget);
     expect(find.text('Tasks'), findsWidgets);
-    expect(find.text('Tasks is under construction'), findsOneWidget);
-    expect(find.text('Back to Workbench'), findsOneWidget);
+  });
+
+  testWidgets('calendar route is reachable from workbench', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const LazyNoteApp());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    await tapWorkbenchButton(tester, 'Calendar');
+
+    expect(find.byKey(const Key('calendar_page_root')), findsOneWidget);
+    expect(find.text('Calendar'), findsWidgets);
   });
 
   testWidgets('settings placeholder route is reachable from workbench', (

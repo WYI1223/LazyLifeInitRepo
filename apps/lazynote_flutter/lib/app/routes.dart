@@ -12,6 +12,9 @@ abstract final class AppRoutes {
   /// Placeholder tasks section (left pane).
   static const tasks = '/tasks';
 
+  /// Calendar section (left pane).
+  static const calendar = '/calendar';
+
   /// Placeholder settings section (left pane).
   static const settings = '/settings';
 

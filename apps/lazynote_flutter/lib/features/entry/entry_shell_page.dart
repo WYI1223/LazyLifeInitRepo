@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:lazynote_flutter/features/calendar/calendar_page.dart';
 import 'package:lazynote_flutter/features/diagnostics/rust_diagnostics_page.dart';
 import 'package:lazynote_flutter/features/entry/single_entry_controller.dart';
 import 'package:lazynote_flutter/features/entry/single_entry_panel.dart';
 import 'package:lazynote_flutter/features/entry/workbench_shell_layout.dart';
 import 'package:lazynote_flutter/features/notes/notes_page.dart';
+import 'package:lazynote_flutter/features/tasks/tasks_page.dart';
 
 /// Left-pane sections inside Workbench shell.
-enum WorkbenchSection { home, notes, tasks, settings, rustDiagnostics }
+enum WorkbenchSection { home, notes, tasks, calendar, settings, rustDiagnostics }
 
 /// Default shell page used to validate new features before wiring final UIs.
 ///
@@ -70,6 +72,7 @@ class _EntryShellPageState extends State<EntryShellPage> {
       WorkbenchSection.home => 'LazyNote Workbench',
       WorkbenchSection.notes => 'Notes',
       WorkbenchSection.tasks => 'Tasks',
+      WorkbenchSection.calendar => 'Calendar',
       WorkbenchSection.settings => 'Settings',
       WorkbenchSection.rustDiagnostics => 'Rust Diagnostics',
     };
@@ -145,7 +148,11 @@ class _EntryShellPageState extends State<EntryShellPage> {
             ),
             OutlinedButton(
               onPressed: () => _openSection(WorkbenchSection.tasks),
-              child: const Text('Tasks (Placeholder)'),
+              child: const Text('Tasks'),
+            ),
+            OutlinedButton(
+              onPressed: () => _openSection(WorkbenchSection.calendar),
+              child: const Text('Calendar'),
             ),
             OutlinedButton(
               onPressed: () => _openSection(WorkbenchSection.settings),
@@ -209,9 +216,11 @@ class _EntryShellPageState extends State<EntryShellPage> {
       WorkbenchSection.notes => NotesPage(
         onBackToWorkbench: () => _openSection(WorkbenchSection.home),
       ),
-      WorkbenchSection.tasks => _buildPlaceholder(
-        title: 'Tasks',
-        description: 'Tasks UI will be implemented in a dedicated PR.',
+      WorkbenchSection.tasks => TasksPage(
+        onBackToWorkbench: () => _openSection(WorkbenchSection.home),
+      ),
+      WorkbenchSection.calendar => CalendarPage(
+        onBackToWorkbench: () => _openSection(WorkbenchSection.home),
       ),
       WorkbenchSection.settings => _buildPlaceholder(
         title: 'Settings',
@@ -249,6 +258,7 @@ class FeaturePlaceholderPage extends StatelessWidget {
     final section = switch (title.toLowerCase()) {
       'notes' => WorkbenchSection.notes,
       'tasks' => WorkbenchSection.tasks,
+      'calendar' => WorkbenchSection.calendar,
       'settings' => WorkbenchSection.settings,
       _ => WorkbenchSection.home,
     };
