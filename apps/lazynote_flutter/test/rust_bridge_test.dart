@@ -34,21 +34,48 @@ void main() {
     expect(initCalls, 1);
   });
 
-  test('init can retry after first failure', () async {
+  test('init does not retry after first failure', () async {
     RustBridge.resetForTesting();
     RustBridge.candidateLibraryPathsOverride = const [];
 
     var initAttempts = 0;
     RustBridge.rustLibInit = (_) async {
       initAttempts += 1;
-      if (initAttempts == 1) {
-        throw StateError('first init failed');
-      }
+      throw StateError('first init failed');
     };
 
     await expectLater(RustBridge.init(), throwsA(isA<StateError>()));
-    await RustBridge.init();
-    expect(initAttempts, 2);
+    await expectLater(
+      RustBridge.init(),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.toString(),
+          'message',
+          contains('RustBridge init permanently failed'),
+        ),
+      ),
+    );
+    expect(initAttempts, 1);
+  });
+
+  test('init-after-failure does not re-enter RustLib.init concurrently', () async {
+    RustBridge.resetForTesting();
+    RustBridge.candidateLibraryPathsOverride = const [];
+
+    var initAttempts = 0;
+    RustBridge.rustLibInit = (_) async {
+      initAttempts += 1;
+      throw StateError('init failed');
+    };
+
+    await expectLater(RustBridge.init(), throwsA(isA<StateError>()));
+    final outcomes = await Future.wait([
+      RustBridge.init().then((_) => false).catchError((_) => true),
+      RustBridge.init().then((_) => false).catchError((_) => true),
+    ]);
+
+    expect(outcomes.every((v) => v), isTrue);
+    expect(initAttempts, 1);
   });
 
   test('falls back to next candidate if opening library fails', () async {
@@ -171,11 +198,15 @@ void main() {
     'bootstrapLogging returns failure when entry db path config fails',
     () async {
       RustBridge.resetForTesting();
+      final logMessages = <String>[];
       RustBridge.entryDbPathResolver = () async =>
           '${Directory.systemTemp.path}${Platform.pathSeparator}data${Platform.pathSeparator}entry.sqlite3';
       RustBridge.logDirPathResolver = () async =>
           '${Directory.systemTemp.path}${Platform.pathSeparator}logs';
       RustBridge.rustLibInit = (_) async {};
+      RustBridge.logger = ({required message, error, stackTrace}) {
+        logMessages.add(message);
+      };
       RustBridge.configureEntryDbPathCall = ({required dbPath}) =>
           'db path denied';
       var initLoggingCalls = 0;
@@ -188,6 +219,31 @@ void main() {
       expect(snapshot.isSuccess, isFalse);
       expect(snapshot.errorMessage, contains('db path denied'));
       expect(initLoggingCalls, 0);
+      expect(
+        logMessages.any((m) => m.contains('entry-db-path configure failed')),
+        isTrue,
+      );
     },
   );
+
+  test('bootstrapLogging labels logging init failures clearly', () async {
+    RustBridge.resetForTesting();
+    final logMessages = <String>[];
+    RustBridge.entryDbPathResolver = () async =>
+        '${Directory.systemTemp.path}${Platform.pathSeparator}data${Platform.pathSeparator}entry.sqlite3';
+    RustBridge.logDirPathResolver = () async =>
+        '${Directory.systemTemp.path}${Platform.pathSeparator}logs';
+    RustBridge.rustLibInit = (_) async {};
+    RustBridge.logger = ({required message, error, stackTrace}) {
+      logMessages.add(message);
+    };
+    RustBridge.configureEntryDbPathCall = ({required dbPath}) => '';
+    RustBridge.initLoggingCall = ({required level, required logDir}) =>
+        'logging denied';
+
+    final snapshot = await RustBridge.bootstrapLogging();
+    expect(snapshot.isSuccess, isFalse);
+    expect(snapshot.errorMessage, contains('logging denied'));
+    expect(logMessages.any((m) => m.contains('logging-init failed')), isTrue);
+  });
 }

@@ -31,6 +31,11 @@ class LocalSettingsStore {
     );
   };
 
+  /// Resets all static state for test isolation.
+  /// IMPORTANT: any new static field added to this class MUST be reset here.
+  /// Current fields:
+  /// _initialized, _initFuture, _entryUiTuning, _loggingLevelOverride,
+  /// settingsFilePathResolver, logger.
   @visibleForTesting
   static void resetForTesting() {
     _initialized = false;

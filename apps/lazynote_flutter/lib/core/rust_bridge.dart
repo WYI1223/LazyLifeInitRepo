@@ -69,6 +69,7 @@ typedef RustConfigureEntryDbPathCall =
 class RustBridge {
   static bool _initialized = false;
   static Future<void>? _initFuture;
+  static bool _initFailed = false;
   // Tracks entry DB path readiness independently from logging bootstrap.
   // Search/command paths can require this before logs are initialized.
   static bool _entryDbPathConfigured = false;
@@ -132,11 +133,20 @@ class RustBridge {
   @visibleForTesting
   static List<String>? candidateLibraryPathsOverride;
 
-  /// Resets mutable static hooks to production defaults for isolated tests.
+  /// Resets all static state for test isolation.
+  /// IMPORTANT: any new static field added to this class MUST be reset here.
+  /// Current fields:
+  /// _initialized, _initFuture, _initFailed, _entryDbPathConfigured,
+  /// _entryDbPathFuture, _latestLoggingInitSnapshot, _loggingInitFuture,
+  /// operatingSystem, fileExists, externalLibraryOpener, rustLibInit,
+  /// entryDbPathResolver, logDirPathResolver, defaultLogLevelResolver,
+  /// initLoggingCall, configureEntryDbPathCall, logger,
+  /// candidateLibraryPathsOverride.
   @visibleForTesting
   static void resetForTesting() {
     _initialized = false;
     _initFuture = null;
+    _initFailed = false;
     _entryDbPathConfigured = false;
     _entryDbPathFuture = null;
     _latestLoggingInitSnapshot = null;
@@ -217,6 +227,11 @@ class RustBridge {
     if (_initialized) {
       return Future.value();
     }
+    if (_initFailed) {
+      return Future.error(
+        StateError('RustBridge init permanently failed'),
+      );
+    }
 
     final inFlight = _initFuture;
     if (inFlight != null) {
@@ -236,6 +251,7 @@ class RustBridge {
       _initialized = true;
     } catch (_) {
       _initFuture = null;
+      _initFailed = true;
       rethrow;
     }
   }
@@ -318,14 +334,53 @@ class RustBridge {
     var resolvedLogDir = 'unresolved';
     var resolvedDbPath = 'unresolved';
 
-    RustLoggingInitSnapshot result;
+    RustLoggingInitSnapshot complete(RustLoggingInitSnapshot snapshot) {
+      _latestLoggingInitSnapshot = snapshot;
+      _loggingInitFuture = null;
+      return snapshot;
+    }
+
     try {
       // Why: keep platform path resolution in Flutter and pass resolved path
       // into Rust to avoid platform-specific path guessing in core.
       resolvedLogDir = await logDirPathResolver();
       resolvedDbPath = await entryDbPathResolver();
+    } catch (error, stackTrace) {
+      logger(
+        message:
+            'bootstrap path resolve failed. log_dir=$resolvedLogDir db_path=$resolvedDbPath',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return complete(
+        RustLoggingInitSnapshot.failure(
+          level: level,
+          logDir: resolvedLogDir,
+          errorMessage: error.toString(),
+        ),
+      );
+    }
 
+    try {
       await ensureEntryDbPathConfigured(dbPathOverride: resolvedDbPath);
+    } catch (error, stackTrace) {
+      logger(
+        message:
+            'entry-db-path configure failed. log_dir=$resolvedLogDir db_path=$resolvedDbPath',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return complete(
+        RustLoggingInitSnapshot.failure(
+          level: level,
+          logDir: resolvedLogDir,
+          errorMessage: error.toString(),
+        ),
+      );
+    }
+
+    RustLoggingInitSnapshot result;
+    try {
       final initError = initLoggingCall(level: level, logDir: resolvedLogDir);
       if (initError.isEmpty) {
         result = RustLoggingInitSnapshot.success(
@@ -333,7 +388,10 @@ class RustBridge {
           logDir: resolvedLogDir,
         );
       } else {
-        logger(message: 'Rust logging init returned error.', error: initError);
+        logger(
+          message: 'logging-init failed. log_dir=$resolvedLogDir',
+          error: initError,
+        );
         result = RustLoggingInitSnapshot.failure(
           level: level,
           logDir: resolvedLogDir,
@@ -342,8 +400,7 @@ class RustBridge {
       }
     } catch (error, stackTrace) {
       logger(
-        message:
-            'Rust logging/entry-db init failed. log_dir=$resolvedLogDir db_path=$resolvedDbPath',
+        message: 'logging-init failed. log_dir=$resolvedLogDir',
         error: error,
         stackTrace: stackTrace,
       );
@@ -354,9 +411,7 @@ class RustBridge {
       );
     }
 
-    _latestLoggingInitSnapshot = result;
-    _loggingInitFuture = null;
-    return result;
+    return complete(result);
   }
 
   /// Runs Rust smoke APIs used by diagnostics UI.

@@ -1,7 +1,7 @@
 # PR-0220A-flutter-lifecycle-hardening
 
 - Proposed title: `fix(core): RustBridge lifecycle hardening and error separation`
-- Status: Planned
+- Status: Completed
 - Source: review-02 §3.1, §3.2, §3.3
 
 ## Goal
@@ -110,10 +110,10 @@ message).
 
 ## Acceptance Criteria
 
-- [ ] (R02-3.2) `bootstrapLogging` splits DB-path init and logging init into separate
+- [x] (R02-3.2) `bootstrapLogging` splits DB-path init and logging init into separate
       `try/catch` blocks with distinct error labels.
-- [ ] (R02-3.3) `_initFailed` flag prevents a second `RustLib.init()` call after a
+- [x] (R02-3.3) `_initFailed` flag prevents a second `RustLib.init()` call after a
       permanent failure; test verifies `rustLibInit` is called at most once per process.
-- [ ] (R02-3.1) `resetForTesting()` has a doc comment listing all static fields it resets,
+- [x] (R02-3.1) `resetForTesting()` has a doc comment listing all static fields it resets,
       and `_initFailed` is included in the reset.
-- [ ] Flutter quality gates pass.
+- [x] Flutter quality gates pass.
