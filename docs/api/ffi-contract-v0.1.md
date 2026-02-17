@@ -84,7 +84,7 @@ For notes/tags contracts added in PR-0010B, see:
   - business failure encoded as `ok=false` + `error_code`
 - Semantics:
   - default limit: 10
-  - max limit: 10
+  - max limit: 50
   - response `applied_limit` must be used by UI as authoritative value
 
 ### `entry_create_note(content) -> EntryActionResponse`

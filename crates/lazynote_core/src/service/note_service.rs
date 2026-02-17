@@ -18,10 +18,12 @@ use crate::repo::atom_repo::{RepoError, RepoResult};
 use crate::repo::note_repo::{
     normalize_note_limit, normalize_tag, normalize_tags, NoteListQuery, NoteRecord, NoteRepository,
 };
+use log::{error, info};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::time::Instant;
 
 static MARKDOWN_IMAGE_RE: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"!\[[^\]]*]\(([^)]+)\)").expect("valid image regex"));
@@ -104,18 +106,51 @@ impl<R: NoteRepository> NoteService<R> {
 
     /// Creates one note from markdown content.
     pub fn create_note(&self, content: impl Into<String>) -> Result<NoteRecord, NoteServiceError> {
+        let started_at = Instant::now();
         let content = content.into();
         let preview = derive_markdown_preview(content.as_str());
         let mut atom = Atom::new(AtomType::Note, content);
         atom.preview_text = preview.preview_text.clone();
         atom.preview_image = preview.preview_image.clone();
 
-        let atom_id = self.repo.create_note(&atom)?;
-        self.repo
-            .get_note(atom_id)?
-            .ok_or(NoteServiceError::InconsistentState(
-                "created note not found in read-back",
-            ))
+        let atom_id = match self.repo.create_note(&atom) {
+            Ok(atom_id) => atom_id,
+            Err(err) => {
+                error!(
+                    "event=note_create module=service status=error duration_ms={} error_code=repo_write_failed error={}",
+                    started_at.elapsed().as_millis(),
+                    err
+                );
+                return Err(err.into());
+            }
+        };
+
+        match self.repo.get_note(atom_id) {
+            Ok(Some(note)) => {
+                info!(
+                    "event=note_create module=service status=ok duration_ms={}",
+                    started_at.elapsed().as_millis()
+                );
+                Ok(note)
+            }
+            Ok(None) => {
+                error!(
+                    "event=note_create module=service status=error duration_ms={} error_code=inconsistent_state",
+                    started_at.elapsed().as_millis()
+                );
+                Err(NoteServiceError::InconsistentState(
+                    "created note not found in read-back",
+                ))
+            }
+            Err(err) => {
+                error!(
+                    "event=note_create module=service status=error duration_ms={} error_code=repo_read_failed error={}",
+                    started_at.elapsed().as_millis(),
+                    err
+                );
+                Err(err.into())
+            }
+        }
     }
 
     /// Replaces note content fully and recomputes preview projections.
@@ -124,20 +159,51 @@ impl<R: NoteRepository> NoteService<R> {
         atom_id: AtomId,
         content: impl Into<String>,
     ) -> Result<NoteRecord, NoteServiceError> {
+        let started_at = Instant::now();
         let content = content.into();
         let preview = derive_markdown_preview(content.as_str());
-        self.repo.update_note_full(
+        if let Err(err) = self.repo.update_note_full(
             atom_id,
             content.as_str(),
             preview.preview_text.as_deref(),
             preview.preview_image.as_deref(),
-        )?;
+        ) {
+            error!(
+                "event=note_update module=service status=error duration_ms={} error_code=repo_write_failed error={}",
+                started_at.elapsed().as_millis(),
+                err
+            );
+            return Err(err.into());
+        }
 
-        self.repo
-            .get_note(atom_id)?
-            .ok_or(NoteServiceError::InconsistentState(
-                "updated note not found in read-back",
-            ))
+        match self.repo.get_note(atom_id) {
+            Ok(Some(note)) => {
+                info!(
+                    "event=note_update module=service status=ok duration_ms={}",
+                    started_at.elapsed().as_millis()
+                );
+                Ok(note)
+            }
+            Ok(None) => {
+                error!(
+                    "event=note_update module=service status=error duration_ms={} error_code=inconsistent_state atom_id={}",
+                    started_at.elapsed().as_millis(),
+                    atom_id
+                );
+                Err(NoteServiceError::InconsistentState(
+                    "updated note not found in read-back",
+                ))
+            }
+            Err(err) => {
+                error!(
+                    "event=note_update module=service status=error duration_ms={} error_code=repo_read_failed atom_id={} error={}",
+                    started_at.elapsed().as_millis(),
+                    atom_id,
+                    err
+                );
+                Err(err.into())
+            }
+        }
     }
 
     /// Gets one note by stable ID.

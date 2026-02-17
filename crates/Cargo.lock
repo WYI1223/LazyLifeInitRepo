@@ -563,6 +563,8 @@ version = "0.1.0"
 dependencies = [
  "flutter_rust_bridge",
  "lazynote_core",
+ "log",
+ "rusqlite",
  "uuid",
 ]
 

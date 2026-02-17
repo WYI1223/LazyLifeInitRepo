@@ -1,7 +1,7 @@
 # PR-0219-rust-infrastructure-hardening
 
 - Proposed title: `fix(core/ffi): Rust infrastructure hardening (safety, WAL, observability)`
-- Status: Planned
+- Status: Completed
 - Source: review-01 issues 1–5, 7, 9, 10 + review-02 issues 4.1, 4.2
 
 ## Goal
@@ -139,13 +139,13 @@ Manual checks:
 
 ## Acceptance Criteria
 
-- [ ] `resolve_entry_db_path` Mutex poison path emits `error!` before falling back.
-- [ ] `PRAGMA journal_mode=WAL` is applied on every connection bootstrap.
-- [ ] `entry_search` error codes match `docs/api/error-codes.md`.
-- [ ] `ENTRY_SEARCH_MAX_LIMIT = 50` and docs are consistent.
-- [ ] `atom.validate()` is called at repo create/update entry points.
-- [ ] `tags_list_impl` no longer duplicates lowercase normalization.
-- [ ] `db_busy` is a registered stable error code.
-- [ ] Panic hook calls `_logger.flush()` (or documents why it cannot, if version constraint).
-- [ ] `note_create`, `note_update`, `search_all` emit `duration_ms` log entries.
-- [ ] All Rust quality gates pass.
+- [x] `resolve_entry_db_path` Mutex poison path emits `error!` before falling back.
+- [x] `PRAGMA journal_mode=WAL` is applied on every connection bootstrap.
+- [x] `entry_search` error codes match `docs/api/error-codes.md`.
+- [x] `ENTRY_SEARCH_MAX_LIMIT = 50` and docs are consistent.
+- [x] `atom.validate()` is called at repo create/update entry points.
+- [x] `tags_list_impl` no longer duplicates lowercase normalization.
+- [x] `db_busy` is a registered stable error code.
+- [x] Panic hook calls `_logger.flush()` (or documents why it cannot, if version constraint).
+- [x] `note_create`, `note_update`, `search_all` emit `duration_ms` log entries.
+- [x] All Rust quality gates pass.

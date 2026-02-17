@@ -14,8 +14,8 @@ Producer: `crates/lazynote_ffi/src/api.rs`
 
 | Code | Meaning | Typical Cause | UI Handling |
 | --- | --- | --- | --- |
-| `db_open_failed` | entry DB cannot be opened | invalid path, permissions, IO failure | show inline error, keep input |
-| `search_failed` | search execution failed | SQL/FTS query failure | show inline error, keep input |
+| `db_error` | entry DB cannot be opened | invalid path, permissions, IO failure | show inline error, keep input |
+| `internal_error` | search execution failed | SQL/FTS query failure | show inline error, keep input |
 
 ## Notes/Tags (FFI)
 
@@ -26,6 +26,7 @@ Producer: `crates/lazynote_ffi/src/api.rs`
 | `invalid_note_id` | note id format invalid | non-UUID `atom_id` | show validation error, keep input |
 | `invalid_tag` | invalid tag value | blank or malformed tag input | show validation error, keep input |
 | `note_not_found` | target note missing | stale/deleted id | show not-found state and refresh list |
+| `db_busy` | repository/database is temporarily locked | concurrent writer/reader lock contention | show retry affordance and keep user input |
 | `db_error` | repository/database failure | sqlite/schema/io issue | show error and allow retry |
 | `invalid_argument` | input violates contract | unsupported argument/value | show validation error, keep input |
 | `internal_error` | unexpected invariant failure | read-back mismatch or unexpected state | show error and allow retry |

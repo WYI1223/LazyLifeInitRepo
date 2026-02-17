@@ -15,6 +15,15 @@ This file is the consolidated index for FFI contracts.
 2. Notes/tags contracts (PR-0010B):
    - this document section below
 
+## Entry API Notes (PR-0219)
+
+- `entry_search(text, limit?)`
+  - default limit: `10`
+  - max limit: `50` (`ENTRY_SEARCH_MAX_LIMIT`)
+  - stable error codes on failure:
+    - `db_error` for DB open/bootstrap failures
+    - `internal_error` for search execution failures
+
 ## Notes/Tags APIs (PR-0010B)
 
 All APIs are use-case level and async.
@@ -60,6 +69,7 @@ Producer: `crates/lazynote_ffi/src/api.rs`
 - `invalid_note_id`
 - `invalid_tag`
 - `note_not_found`
+- `db_busy`
 - `db_error`
 - `invalid_argument`
 - `internal_error`

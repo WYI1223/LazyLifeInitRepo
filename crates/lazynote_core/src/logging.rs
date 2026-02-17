@@ -210,6 +210,9 @@ fn install_panic_hook_once() {
             "event=panic_captured module=core status=error location={} payload={}",
             location, payload
         );
+        if let Some(state) = LOGGING_STATE.get() {
+            state._logger.flush();
+        }
         previous_hook(panic_info);
     }));
 

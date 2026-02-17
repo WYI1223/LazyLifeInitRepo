@@ -18,12 +18,13 @@ use lazynote_core::{
     ScheduleEventRequest, SearchQuery, SectionAtom, SqliteAtomRepository, SqliteNoteRepository,
     TaskService, TaskServiceError,
 };
+use log::error;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use uuid::Uuid;
 
 const ENTRY_DEFAULT_LIMIT: u32 = 10;
-const ENTRY_LIMIT_MAX: u32 = 10;
+const ENTRY_SEARCH_MAX_LIMIT: u32 = 50;
 const ENTRY_DB_FILE_NAME: &str = "lazynote_entry.sqlite3";
 static ENTRY_DB_PATH_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
 
@@ -200,6 +201,7 @@ enum NotesFfiError {
     InvalidNoteId(String),
     InvalidTag(String),
     NoteNotFound(String),
+    DbBusy(String),
     DbError(String),
     InvalidArgument(String),
     Internal(String),
@@ -211,6 +213,7 @@ impl NotesFfiError {
             Self::InvalidNoteId(_) => "invalid_note_id",
             Self::InvalidTag(_) => "invalid_tag",
             Self::NoteNotFound(_) => "note_not_found",
+            Self::DbBusy(_) => "db_busy",
             Self::DbError(_) => "db_error",
             Self::InvalidArgument(_) => "invalid_argument",
             Self::Internal(_) => "internal_error",
@@ -222,6 +225,7 @@ impl NotesFfiError {
             Self::InvalidNoteId(value) => format!("invalid note id: {value}"),
             Self::InvalidTag(value) => format!("invalid tag: {value}"),
             Self::NoteNotFound(value) => format!("note not found: {value}"),
+            Self::DbBusy(value) => format!("notes database busy: {value}"),
             Self::DbError(value) => format!("notes database error: {value}"),
             Self::InvalidArgument(value) => format!("invalid argument: {value}"),
             Self::Internal(value) => format!("internal error: {value}"),
@@ -249,7 +253,7 @@ fn entry_search_impl(text: String, limit: Option<u32>) -> EntrySearchResponse {
         Err(err) => {
             return EntrySearchResponse {
                 ok: false,
-                error_code: Some("db_open_failed".to_string()),
+                error_code: Some("db_error".to_string()),
                 items: Vec::new(),
                 message: format!("entry_search failed: {err}"),
                 applied_limit: normalized_limit,
@@ -285,7 +289,7 @@ fn entry_search_impl(text: String, limit: Option<u32>) -> EntrySearchResponse {
         }
         Err(err) => EntrySearchResponse {
             ok: false,
-            error_code: Some("search_failed".to_string()),
+            error_code: Some("internal_error".to_string()),
             items: Vec::new(),
             message: format!("entry_search failed: {err}"),
             applied_limit: normalized_limit,
@@ -528,16 +532,7 @@ pub async fn tags_list() -> TagsListResponse {
 }
 
 fn tags_list_impl() -> TagsListResponse {
-    match with_note_service(|service| {
-        service
-            .list_tags()
-            .map_err(NoteServiceError::from)
-            .map(|tags| {
-                tags.into_iter()
-                    .map(|tag| tag.to_lowercase())
-                    .collect::<Vec<_>>()
-            })
-    }) {
+    match with_note_service(|service| service.list_tags().map_err(NoteServiceError::from)) {
         Ok(tags) => TagsListResponse {
             ok: true,
             error_code: None,
@@ -556,7 +551,7 @@ fn tags_list_impl() -> TagsListResponse {
 fn normalize_entry_limit(limit: Option<u32>) -> u32 {
     match limit {
         Some(0) => ENTRY_DEFAULT_LIMIT,
-        Some(value) if value > ENTRY_LIMIT_MAX => ENTRY_LIMIT_MAX,
+        Some(value) if value > ENTRY_SEARCH_MAX_LIMIT => ENTRY_SEARCH_MAX_LIMIT,
         Some(value) => value,
         None => ENTRY_DEFAULT_LIMIT,
     }
@@ -570,9 +565,14 @@ fn resolve_entry_db_path() -> PathBuf {
         }
     }
 
-    if let Ok(guard) = ENTRY_DB_PATH_OVERRIDE.lock() {
-        if let Some(path) = guard.as_ref() {
-            return path.clone();
+    match ENTRY_DB_PATH_OVERRIDE.lock() {
+        Ok(guard) => {
+            if let Some(path) = guard.as_ref() {
+                return path.clone();
+            }
+        }
+        Err(_) => {
+            error!("event=db_path_resolve module=ffi status=error error_code=mutex_poisoned");
         }
     }
 
@@ -621,9 +621,8 @@ fn with_note_service<T>(
     f: impl FnOnce(&mut NoteService<SqliteNoteRepository<'_>>) -> Result<T, NoteServiceError>,
 ) -> Result<T, NotesFfiError> {
     let db_path = resolve_entry_db_path();
-    let mut conn = open_db(&db_path).map_err(|err| NotesFfiError::DbError(err.to_string()))?;
-    let repo = SqliteNoteRepository::try_new(&mut conn)
-        .map_err(|err| NotesFfiError::DbError(err.to_string()))?;
+    let mut conn = open_db(&db_path).map_err(map_db_error)?;
+    let repo = SqliteNoteRepository::try_new(&mut conn).map_err(map_repo_error)?;
     let mut service = NoteService::new(repo);
     f(&mut service).map_err(map_note_service_error)
 }
@@ -671,7 +670,7 @@ fn map_repo_error(err: lazynote_core::RepoError) -> NotesFfiError {
         lazynote_core::RepoError::Validation(validation) => {
             NotesFfiError::InvalidArgument(validation.to_string())
         }
-        lazynote_core::RepoError::Db(db_err) => NotesFfiError::DbError(db_err.to_string()),
+        lazynote_core::RepoError::Db(db_err) => map_db_error(db_err),
         lazynote_core::RepoError::UninitializedConnection {
             expected_version,
             actual_version,
@@ -688,6 +687,23 @@ fn map_repo_error(err: lazynote_core::RepoError) -> NotesFfiError {
         }
         lazynote_core::RepoError::InvalidData(details) => NotesFfiError::Internal(details),
     }
+}
+
+fn map_db_error(err: lazynote_core::db::DbError) -> NotesFfiError {
+    if is_db_busy(&err) {
+        NotesFfiError::DbBusy(err.to_string())
+    } else {
+        NotesFfiError::DbError(err.to_string())
+    }
+}
+
+fn is_db_busy(err: &lazynote_core::db::DbError) -> bool {
+    matches!(
+        err,
+        lazynote_core::db::DbError::Sqlite(rusqlite::Error::SqliteFailure(sqlite_err, _))
+            if sqlite_err.code == rusqlite::ErrorCode::DatabaseBusy
+                || sqlite_err.code == rusqlite::ErrorCode::DatabaseLocked
+    )
 }
 
 fn to_entry_search_item(hit: lazynote_core::SearchHit) -> EntrySearchItem {
@@ -1091,8 +1107,9 @@ mod tests {
     use super::{
         calendar_list_by_range_impl, calendar_update_event_impl, configure_entry_db_path,
         core_version, entry_create_note_impl, entry_create_task_impl, entry_schedule_impl,
-        entry_search_impl, init_logging, map_repo_error, note_create_impl, note_get_impl,
-        note_set_tags_impl, note_update_impl, notes_list_impl, ping, tags_list_impl, NotesFfiError,
+        entry_search_impl, init_logging, map_db_error, map_repo_error, note_create_impl,
+        note_get_impl, note_set_tags_impl, note_update_impl, notes_list_impl, ping, tags_list_impl,
+        NotesFfiError,
     };
     use lazynote_core::db::open_db;
     use std::sync::{Mutex, MutexGuard};
@@ -1157,8 +1174,8 @@ mod tests {
             .clone()
             .expect("created note should return atom_id");
 
-        let response = entry_search_impl(token, Some(42));
-        assert_eq!(response.applied_limit, 10);
+        let response = entry_search_impl(token, Some(200));
+        assert_eq!(response.applied_limit, 50);
         assert!(response.ok, "{}", response.message);
         assert!(response.error_code.is_none());
         assert!(response.items.iter().any(|item| item.atom_id == created_id));
@@ -1345,6 +1362,28 @@ mod tests {
             "broken row".to_string(),
         ));
         assert!(matches!(mapped, NotesFfiError::Internal(details) if details == "broken row"));
+    }
+
+    #[test]
+    fn sqlite_busy_maps_to_db_busy_error_code() {
+        let mapped = map_db_error(lazynote_core::db::DbError::Sqlite(
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_BUSY),
+                Some("database is busy".to_string()),
+            ),
+        ));
+        assert!(matches!(mapped, NotesFfiError::DbBusy(_)));
+    }
+
+    #[test]
+    fn sqlite_locked_maps_to_db_busy_error_code() {
+        let mapped = map_db_error(lazynote_core::db::DbError::Sqlite(
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_LOCKED),
+                Some("database is locked".to_string()),
+            ),
+        ));
+        assert!(matches!(mapped, NotesFfiError::DbBusy(_)));
     }
 
     #[test]

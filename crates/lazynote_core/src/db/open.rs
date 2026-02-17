@@ -100,7 +100,11 @@ pub fn open_db_in_memory() -> DbResult<Connection> {
 }
 
 fn bootstrap_connection(conn: &mut Connection) -> DbResult<()> {
-    conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+    conn.execute_batch(
+        "PRAGMA foreign_keys = ON;
+         PRAGMA journal_mode = WAL;
+         PRAGMA synchronous = NORMAL;",
+    )?;
     conn.busy_timeout(Duration::from_secs(5))?;
     apply_migrations(conn)?;
     Ok(())
