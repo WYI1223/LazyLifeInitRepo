@@ -179,6 +179,57 @@ fn move_with_target_order_reorders_siblings() {
 }
 
 #[test]
+fn move_target_order_uses_visible_sibling_index_only() {
+    let conn = setup();
+    let atom_repo = SqliteAtomRepository::try_new(&conn).unwrap();
+    let tree_repo = SqliteTreeRepository::try_new(&conn).unwrap();
+    let service = TreeService::new(tree_repo);
+
+    let note_hidden = Atom::new(AtomType::Note, "hidden");
+    let note_a = Atom::new(AtomType::Note, "a");
+    let note_b = Atom::new(AtomType::Note, "b");
+    insert_atom(&conn, &note_hidden);
+    insert_atom(&conn, &note_a);
+    insert_atom(&conn, &note_b);
+
+    let root = service.create_folder(None, "Root").unwrap();
+    let hidden_ref = service
+        .create_note_ref(
+            Some(root.node_uuid),
+            note_hidden.uuid,
+            Some("hidden".to_string()),
+        )
+        .unwrap();
+    let ref_a = service
+        .create_note_ref(Some(root.node_uuid), note_a.uuid, Some("A".to_string()))
+        .unwrap();
+    let ref_b = service
+        .create_note_ref(Some(root.node_uuid), note_b.uuid, Some("B".to_string()))
+        .unwrap();
+
+    atom_repo.soft_delete_atom(note_hidden.uuid).unwrap();
+    let before = service.list_children(Some(root.node_uuid)).unwrap();
+    assert_eq!(before.len(), 2);
+    assert_eq!(before[0].node_uuid, ref_a.node_uuid);
+    assert_eq!(before[1].node_uuid, ref_b.node_uuid);
+
+    service
+        .move_node(ref_a.node_uuid, Some(root.node_uuid), Some(1))
+        .unwrap();
+
+    let after = service.list_children(Some(root.node_uuid)).unwrap();
+    assert_eq!(after.len(), 2);
+    assert_eq!(after[0].node_uuid, ref_b.node_uuid);
+    assert_eq!(after[1].node_uuid, ref_a.node_uuid);
+
+    // Hidden dangling sibling should remain hidden and not occupy visible order slots.
+    let hidden_still_filtered = after
+        .iter()
+        .all(|item| item.node_uuid != hidden_ref.node_uuid);
+    assert!(hidden_still_filtered);
+}
+
+#[test]
 fn create_folder_rejects_unknown_parent() {
     let conn = setup();
     let tree_repo = SqliteTreeRepository::try_new(&conn).unwrap();

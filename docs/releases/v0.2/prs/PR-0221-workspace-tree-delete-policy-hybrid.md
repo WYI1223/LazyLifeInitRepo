@@ -1,7 +1,7 @@
 # PR-0221-workspace-tree-delete-policy-hybrid
 
 - Proposed title: `feat(workspace-core): hybrid delete policy for note and folder`
-- Status: Planned
+- Status: In Progress (M1 completed)
 
 ## Goal
 
@@ -128,6 +128,14 @@ Exit criteria:
   - folder dissolve
   - folder delete_all
   - multi-reference note safety
+
+Completion snapshot:
+
+- [x] Migration `0008` added and registered
+- [x] Strict atom-side blocking triggers from `0007` removed by policy migration
+- [x] Repository read-path filtering for invalid `note_ref` implemented
+- [x] Folder delete modes (`dissolve`, `delete_all`) implemented in core
+- [x] Core tests and lint for M1 passed
 
 ### M2. FFI Contract and Error Semantics
 

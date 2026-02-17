@@ -410,7 +410,7 @@ impl TreeRepository for SqliteTreeRepository<'_> {
         }
 
         let tx = Transaction::new_unchecked(self.conn, TransactionBehavior::Immediate)?;
-        let mut sibling_ids = list_active_child_ids(&tx, new_parent_uuid)?;
+        let mut sibling_ids = list_visible_child_ids(&tx, new_parent_uuid)?;
         sibling_ids.retain(|id| *id != node_uuid);
 
         let target_index = target_order
@@ -591,6 +591,51 @@ fn list_active_child_ids(
              WHERE parent_uuid IS NULL
                AND is_deleted = 0
              ORDER BY sort_order ASC, node_uuid ASC;",
+        )?;
+        let mut rows = stmt.query([])?;
+        while let Some(row) = rows.next()? {
+            let value: String = row.get(0)?;
+            ids.push(parse_uuid(&value, "workspace_nodes.node_uuid")?);
+        }
+    }
+    Ok(ids)
+}
+
+fn list_visible_child_ids(
+    conn: &Connection,
+    parent_uuid: Option<WorkspaceNodeId>,
+) -> TreeRepoResult<Vec<WorkspaceNodeId>> {
+    let mut ids = Vec::new();
+    if let Some(parent_uuid) = parent_uuid {
+        let mut stmt = conn.prepare(
+            "SELECT n.node_uuid
+             FROM workspace_nodes n
+             LEFT JOIN atoms a ON a.uuid = n.atom_uuid
+             WHERE n.parent_uuid = ?1
+               AND n.is_deleted = 0
+               AND (
+                 n.kind = 'folder'
+                 OR (n.kind = 'note_ref' AND a.type = 'note' AND a.is_deleted = 0)
+               )
+             ORDER BY n.sort_order ASC, n.node_uuid ASC;",
+        )?;
+        let mut rows = stmt.query([parent_uuid.to_string()])?;
+        while let Some(row) = rows.next()? {
+            let value: String = row.get(0)?;
+            ids.push(parse_uuid(&value, "workspace_nodes.node_uuid")?);
+        }
+    } else {
+        let mut stmt = conn.prepare(
+            "SELECT n.node_uuid
+             FROM workspace_nodes n
+             LEFT JOIN atoms a ON a.uuid = n.atom_uuid
+             WHERE n.parent_uuid IS NULL
+               AND n.is_deleted = 0
+               AND (
+                 n.kind = 'folder'
+                 OR (n.kind = 'note_ref' AND a.type = 'note' AND a.is_deleted = 0)
+               )
+             ORDER BY n.sort_order ASC, n.node_uuid ASC;",
         )?;
         let mut rows = stmt.query([])?;
         while let Some(row) = rows.next()? {
