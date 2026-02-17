@@ -20,6 +20,7 @@ Out of scope:
 
 - third-party downloadable parser plugins
 - cloud command execution
+- cross-day schedule range semantics (parser keeps same-day `end > start` contract)
 
 ## Step-by-Step
 

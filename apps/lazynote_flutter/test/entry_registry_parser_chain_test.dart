@@ -91,6 +91,27 @@ void main() {
     );
   });
 
+  test('parser chain rejects blank parser id', () {
+    expect(
+      () => EntryParserChain(
+        parsers: const <EntryParserDefinition>[
+          EntryParserDefinition(
+            parserId: '   ',
+            priority: 1,
+            tryParse: _lowPriorityAliasParser,
+          ),
+        ],
+      ),
+      throwsA(
+        isA<ParserChainConflictError>().having(
+          (error) => error.code,
+          'code',
+          'invalid_parser_id',
+        ),
+      ),
+    );
+  });
+
   test('parser chain timeout budget is deterministic', () {
     final chain = EntryParserChain(
       parsers: const <EntryParserDefinition>[
@@ -155,6 +176,32 @@ void main() {
     );
   });
 
+  test('command registry rejects blank command id', () {
+    final registry = EntryCommandRegistry();
+    expect(
+      () => registry.register(
+        CommandRegistryEntry(
+          commandId: '   ',
+          actionLabel: 'invalid',
+          execute: (command) async {
+            return const rust_api.EntryActionResponse(
+              ok: true,
+              atomId: null,
+              message: 'ok',
+            );
+          },
+        ),
+      ),
+      throwsA(
+        isA<CommandRegistryError>().having(
+          (error) => error.code,
+          'code',
+          'invalid_command_id',
+        ),
+      ),
+    );
+  });
+
   test(
     'first-party command registry executes registered command handlers',
     () async {
@@ -193,4 +240,25 @@ void main() {
       expect(noteCalls, 1);
     },
   );
+
+  test(
+    'command registry returns explicit error response for unregistered command',
+    () async {
+      final registry = EntryCommandRegistry();
+      final response = await registry.execute(
+        const NewNoteCommand(content: 'not-registered'),
+      );
+      expect(response.ok, isFalse);
+      expect(response.message, contains('unknown_command_id'));
+      expect(response.message, contains(NewNoteCommand.id));
+    },
+  );
+
+  test('actionLabelFor falls back to command id when entry is missing', () {
+    final registry = EntryCommandRegistry();
+    expect(
+      registry.actionLabelFor('test.command.missing'),
+      'test.command.missing',
+    );
+  });
 }

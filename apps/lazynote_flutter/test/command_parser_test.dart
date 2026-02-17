@@ -80,4 +80,28 @@ void main() {
     final failure = result as CommandParseFailure;
     expect(failure.code, 'schedule_range_invalid');
   });
+
+  test('rejects schedule with invalid month', () {
+    final result = parser.parse('> schedule 13/01/2026 09:30 invalid month');
+    expect(result, isA<CommandParseFailure>());
+
+    final failure = result as CommandParseFailure;
+    expect(failure.code, 'schedule_datetime_invalid');
+  });
+
+  test('rejects schedule with invalid calendar day', () {
+    final result = parser.parse('> schedule 02/30/2026 09:30 invalid day');
+    expect(result, isA<CommandParseFailure>());
+
+    final failure = result as CommandParseFailure;
+    expect(failure.code, 'schedule_datetime_invalid');
+  });
+
+  test('rejects schedule range crossing midnight in same-day contract', () {
+    final result = parser.parse('> schedule 03/15/2026 23:00-01:00 overnight');
+    expect(result, isA<CommandParseFailure>());
+
+    final failure = result as CommandParseFailure;
+    expect(failure.code, 'schedule_range_invalid');
+  });
 }
