@@ -87,7 +87,7 @@ contributors.
   R02-3.3 `_initFailed` flag, R02-3.1 doc comment
 - [edit] `apps/lazynote_flutter/lib/core/settings/local_settings_store.dart` — R02-3.1
   doc comment on `resetForTesting()`
-- [edit/add] `apps/lazynote_flutter/test/rust_bridge_lifecycle_test.dart` — regression
+- [edit] `apps/lazynote_flutter/test/rust_bridge_test.dart` — regression
   test: concurrent init-after-failure does not call `rustLibInit` twice
 
 ## Dependencies
@@ -100,7 +100,7 @@ contributors.
 ```bash
 cd apps/lazynote_flutter
 flutter analyze
-flutter test test/rust_bridge_lifecycle_test.dart
+flutter test test/rust_bridge_test.dart
 flutter test
 ```
 
