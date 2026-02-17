@@ -3,6 +3,10 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:lazynote_flutter/app/ui_slots/first_party_ui_slots.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_host.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_models.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_registry.dart';
 import 'package:lazynote_flutter/features/notes/note_content_area.dart';
 import 'package:lazynote_flutter/features/notes/note_explorer.dart';
 import 'package:lazynote_flutter/features/notes/note_tab_manager.dart';
@@ -12,13 +16,19 @@ import 'package:window_manager/window_manager.dart';
 
 /// Notes feature page mounted in Workbench left pane (PR-0010C foundation).
 class NotesPage extends StatefulWidget {
-  const NotesPage({super.key, this.controller, this.onBackToWorkbench});
+  const NotesPage({
+    super.key,
+    this.controller,
+    this.onBackToWorkbench,
+    this.uiSlotRegistry,
+  });
 
   /// Optional external controller for tests.
   final NotesController? controller;
 
   /// Optional callback that returns to Workbench home section.
   final VoidCallback? onBackToWorkbench;
+  final UiSlotRegistry? uiSlotRegistry;
 
   @override
   State<NotesPage> createState() => _NotesPageState();
@@ -38,6 +48,7 @@ class _NotesPageState extends State<NotesPage>
     with WidgetsBindingObserver, WindowListener {
   late final NotesController _controller;
   late final bool _ownsController;
+  late final UiSlotRegistry _uiSlotRegistry;
   bool _windowCloseGuardEnabled = false;
   bool _preventCloseActive = false;
   bool _handlingWindowClose = false;
@@ -49,6 +60,7 @@ class _NotesPageState extends State<NotesPage>
     WidgetsBinding.instance.addObserver(this);
     _controller = widget.controller ?? NotesController();
     _ownsController = widget.controller == null;
+    _uiSlotRegistry = widget.uiSlotRegistry ?? createFirstPartyUiSlotRegistry();
     _controller.addListener(_onControllerChanged);
     unawaited(_setupWindowCloseGuard());
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -341,34 +353,84 @@ class _NotesPageState extends State<NotesPage>
                           children: [
                             SizedBox(
                               width: explorerWidth,
-                              child: NoteExplorer(
-                                controller: _controller,
-                                onOpenNoteRequested:
-                                    _controller.openNoteFromExplorer,
-                                onCreateNoteRequested: () async {
-                                  await _controller.createNote();
-                                  if (!context.mounted) {
-                                    return;
-                                  }
-                                  final warning = _controller
-                                      .takeCreateWarningMessage();
-                                  if (warning == null) {
-                                    return;
-                                  }
-                                  ScaffoldMessenger.maybeOf(context)
-                                    ?..hideCurrentSnackBar()
-                                    ..showSnackBar(
-                                      SnackBar(
-                                        content: Text(warning),
-                                        behavior: SnackBarBehavior.floating,
-                                        duration: const Duration(seconds: 4),
-                                      ),
-                                    );
+                              child: UiSlotListHost(
+                                registry: _uiSlotRegistry,
+                                slotId: UiSlotIds.notesSidePanel,
+                                layer: UiSlotLayer.sidePanel,
+                                slotContext: UiSlotContext({
+                                  UiSlotContextKeys.notesController:
+                                      _controller,
+                                  UiSlotContextKeys.notesOnOpenNoteRequested:
+                                      _controller.openNoteFromExplorer,
+                                  UiSlotContextKeys
+                                      .notesOnCreateNoteRequested: () async {
+                                    await _controller.createNote();
+                                    if (!context.mounted) {
+                                      return;
+                                    }
+                                    final warning = _controller
+                                        .takeCreateWarningMessage();
+                                    if (warning == null) {
+                                      return;
+                                    }
+                                    ScaffoldMessenger.maybeOf(context)
+                                      ?..hideCurrentSnackBar()
+                                      ..showSnackBar(
+                                        SnackBar(
+                                          content: Text(warning),
+                                          behavior: SnackBarBehavior.floating,
+                                          duration: const Duration(seconds: 4),
+                                        ),
+                                      );
+                                  },
+                                  UiSlotContextKeys
+                                          .notesOnDeleteFolderRequested:
+                                      (String folderId, String mode) {
+                                        return _controller
+                                            .deleteWorkspaceFolder(
+                                              folderId: folderId,
+                                              mode: mode,
+                                            );
+                                      },
+                                }),
+                                listBuilder: (context, children) {
+                                  return children.isEmpty
+                                      ? const SizedBox.shrink()
+                                      : children.first;
                                 },
-                                onDeleteFolderRequested: (folderId, mode) {
-                                  return _controller.deleteWorkspaceFolder(
-                                    folderId: folderId,
-                                    mode: mode,
+                                fallbackBuilder: (context) {
+                                  return NoteExplorer(
+                                    controller: _controller,
+                                    onOpenNoteRequested:
+                                        _controller.openNoteFromExplorer,
+                                    onCreateNoteRequested: () async {
+                                      await _controller.createNote();
+                                      if (!context.mounted) {
+                                        return;
+                                      }
+                                      final warning = _controller
+                                          .takeCreateWarningMessage();
+                                      if (warning == null) {
+                                        return;
+                                      }
+                                      ScaffoldMessenger.maybeOf(context)
+                                        ?..hideCurrentSnackBar()
+                                        ..showSnackBar(
+                                          SnackBar(
+                                            content: Text(warning),
+                                            behavior: SnackBarBehavior.floating,
+                                            duration: const Duration(
+                                              seconds: 4,
+                                            ),
+                                          ),
+                                        );
+                                    },
+                                    onDeleteFolderRequested: (folderId, mode) {
+                                      return _controller.deleteWorkspaceFolder(
+                                        folderId: folderId,
+                                        mode: mode,
+                                      );
+                                    },
                                   );
                                 },
                               ),

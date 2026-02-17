@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:lazynote_flutter/app/ui_slots/first_party_ui_slots.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_host.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_models.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_registry.dart';
 import 'package:lazynote_flutter/features/calendar/calendar_page.dart';
 import 'package:lazynote_flutter/features/diagnostics/rust_diagnostics_page.dart';
 import 'package:lazynote_flutter/features/entry/single_entry_controller.dart';
@@ -25,10 +29,12 @@ class EntryShellPage extends StatefulWidget {
   const EntryShellPage({
     super.key,
     this.initialSection = WorkbenchSection.home,
+    this.uiSlotRegistry,
   });
 
   /// Initial left-pane section to render inside Workbench shell.
   final WorkbenchSection initialSection;
+  final UiSlotRegistry? uiSlotRegistry;
 
   @override
   State<EntryShellPage> createState() => _EntryShellPageState();
@@ -37,12 +43,14 @@ class EntryShellPage extends StatefulWidget {
 class _EntryShellPageState extends State<EntryShellPage> {
   // Single Entry is the primary interactive path in Workbench after PR-0009C.
   final SingleEntryController _singleEntryController = SingleEntryController();
+  late final UiSlotRegistry _uiSlotRegistry;
   late WorkbenchSection _activeSection;
   bool _showSingleEntryPanel = false;
 
   @override
   void initState() {
     super.initState();
+    _uiSlotRegistry = widget.uiSlotRegistry ?? createFirstPartyUiSlotRegistry();
     _activeSection = widget.initialSection;
   }
 
@@ -56,6 +64,30 @@ class _EntryShellPageState extends State<EntryShellPage> {
     setState(() {
       _activeSection = section;
     });
+  }
+
+  void _openSectionById(String sectionId) {
+    final section = switch (sectionId) {
+      WorkbenchSectionIds.home => WorkbenchSection.home,
+      WorkbenchSectionIds.notes => WorkbenchSection.notes,
+      WorkbenchSectionIds.tasks => WorkbenchSection.tasks,
+      WorkbenchSectionIds.calendar => WorkbenchSection.calendar,
+      WorkbenchSectionIds.settings => WorkbenchSection.settings,
+      WorkbenchSectionIds.rustDiagnostics => WorkbenchSection.rustDiagnostics,
+      _ => WorkbenchSection.home,
+    };
+    _openSection(section);
+  }
+
+  String _sectionId(WorkbenchSection section) {
+    return switch (section) {
+      WorkbenchSection.home => WorkbenchSectionIds.home,
+      WorkbenchSection.notes => WorkbenchSectionIds.notes,
+      WorkbenchSection.tasks => WorkbenchSectionIds.tasks,
+      WorkbenchSection.calendar => WorkbenchSectionIds.calendar,
+      WorkbenchSection.settings => WorkbenchSectionIds.settings,
+      WorkbenchSection.rustDiagnostics => WorkbenchSectionIds.rustDiagnostics,
+    };
   }
 
   void _openOrFocusSingleEntryPanel() {
@@ -133,11 +165,43 @@ class _EntryShellPageState extends State<EntryShellPage> {
           ),
         ],
         const SizedBox(height: 24),
-        Text('Diagnostics', style: Theme.of(context).textTheme.titleMedium),
-        const SizedBox(height: 8),
-        OutlinedButton(
-          onPressed: () => _openSection(WorkbenchSection.rustDiagnostics),
-          child: const Text('Rust Diagnostics'),
+        UiSlotListHost(
+          registry: _uiSlotRegistry,
+          slotId: UiSlotIds.workbenchHomeBlocks,
+          layer: UiSlotLayer.contentBlock,
+          slotContext: UiSlotContext({
+            UiSlotContextKeys.onOpenDiagnostics: () {
+              _openSection(WorkbenchSection.rustDiagnostics);
+            },
+          }),
+          listBuilder: (context, children) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var index = 0; index < children.length; index++) ...[
+                  if (index > 0) const SizedBox(height: 24),
+                  children[index],
+                ],
+              ],
+            );
+          },
+          fallbackBuilder: (context) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Diagnostics',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () =>
+                      _openSection(WorkbenchSection.rustDiagnostics),
+                  child: const Text('Rust Diagnostics'),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 24),
         Text(
@@ -145,27 +209,40 @@ class _EntryShellPageState extends State<EntryShellPage> {
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: 8),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            OutlinedButton(
-              onPressed: () => _openSection(WorkbenchSection.notes),
-              child: const Text('Notes'),
-            ),
-            OutlinedButton(
-              onPressed: () => _openSection(WorkbenchSection.tasks),
-              child: const Text('Tasks'),
-            ),
-            OutlinedButton(
-              onPressed: () => _openSection(WorkbenchSection.calendar),
-              child: const Text('Calendar'),
-            ),
-            OutlinedButton(
-              onPressed: () => _openSection(WorkbenchSection.settings),
-              child: const Text('Settings (Placeholder)'),
-            ),
-          ],
+        UiSlotListHost(
+          registry: _uiSlotRegistry,
+          slotId: UiSlotIds.workbenchHomeWidgets,
+          layer: UiSlotLayer.homeWidget,
+          slotContext: UiSlotContext({
+            UiSlotContextKeys.onOpenSection: _openSectionById,
+          }),
+          listBuilder: (context, children) {
+            return Wrap(spacing: 12, runSpacing: 12, children: children);
+          },
+          fallbackBuilder: (context) {
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                OutlinedButton(
+                  onPressed: () => _openSection(WorkbenchSection.notes),
+                  child: const Text('Notes'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _openSection(WorkbenchSection.tasks),
+                  child: const Text('Tasks'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _openSection(WorkbenchSection.calendar),
+                  child: const Text('Calendar'),
+                ),
+                OutlinedButton(
+                  onPressed: () => _openSection(WorkbenchSection.settings),
+                  child: const Text('Settings (Placeholder)'),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
@@ -218,23 +295,36 @@ class _EntryShellPageState extends State<EntryShellPage> {
   }
 
   Widget _buildActiveLeftContent() {
-    return switch (_activeSection) {
-      WorkbenchSection.home => _buildWorkbenchHome(),
-      WorkbenchSection.notes => NotesPage(
-        onBackToWorkbench: () => _openSection(WorkbenchSection.home),
-      ),
-      WorkbenchSection.tasks => TasksPage(
-        onBackToWorkbench: () => _openSection(WorkbenchSection.home),
-      ),
-      WorkbenchSection.calendar => CalendarPage(
-        onBackToWorkbench: () => _openSection(WorkbenchSection.home),
-      ),
-      WorkbenchSection.settings => _buildPlaceholder(
-        title: 'Settings',
-        description: 'Settings UI will be implemented in a dedicated PR.',
-      ),
-      WorkbenchSection.rustDiagnostics => _buildRustDiagnosticsSection(),
-    };
+    return UiSlotViewHost(
+      registry: _uiSlotRegistry,
+      slotId: UiSlotIds.workbenchSectionView,
+      slotContext: UiSlotContext({
+        UiSlotContextKeys.activeSection: _sectionId(_activeSection),
+        UiSlotContextKeys.onBackToWorkbench: () {
+          _openSection(WorkbenchSection.home);
+        },
+      }),
+      fallbackBuilder: (context) {
+        return switch (_activeSection) {
+          WorkbenchSection.home => _buildWorkbenchHome(),
+          WorkbenchSection.notes => NotesPage(
+            onBackToWorkbench: () => _openSection(WorkbenchSection.home),
+            uiSlotRegistry: _uiSlotRegistry,
+          ),
+          WorkbenchSection.tasks => TasksPage(
+            onBackToWorkbench: () => _openSection(WorkbenchSection.home),
+          ),
+          WorkbenchSection.calendar => CalendarPage(
+            onBackToWorkbench: () => _openSection(WorkbenchSection.home),
+          ),
+          WorkbenchSection.settings => _buildPlaceholder(
+            title: 'Settings',
+            description: 'Settings UI will be implemented in a dedicated PR.',
+          ),
+          WorkbenchSection.rustDiagnostics => _buildRustDiagnosticsSection(),
+        };
+      },
+    );
   }
 
   @override

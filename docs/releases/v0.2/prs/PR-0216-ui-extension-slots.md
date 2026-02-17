@@ -1,7 +1,7 @@
 # PR-0216-ui-extension-slots
 
 - Proposed title: `feat(ui-platform): block/view/panel/widget slot contracts`
-- Status: Planned
+- Status: In Progress (core Flutter slot host baseline completed)
 
 ## Goal
 
@@ -48,9 +48,29 @@ Out of scope:
 - `flutter analyze`
 - `flutter test`
 
+Completion snapshot:
+
+- [x] Added UI slot contracts and registry:
+  - `UiSlotLayer` (`contentBlock|view|sidePanel|homeWidget`)
+  - `UiSlotContribution` + lifecycle hooks
+  - deterministic registry ordering and conflict validation
+- [x] Added host adapters:
+  - `UiSlotListHost` for multi-contribution layers
+  - `UiSlotViewHost` for highest-priority view contribution + fallback
+- [x] Migrated first-party subset to slot registration:
+  - Workbench Home diagnostics/content block
+  - Workbench Home navigation widgets
+  - Notes side panel explorer
+- [x] Added widget/unit tests for:
+  - ordering (`priority desc`, `id asc`)
+  - fallback behavior
+  - lifecycle callback mount/dispose
+  - duplicate registration rejection
+- [x] Added architecture contract doc:
+  - `docs/architecture/ui-extension-slots.md`
+
 ## Acceptance Criteria
 
-- [ ] Slot contracts are implemented for block/view/panel/widget layers.
-- [ ] Slot rendering order and fallback rules are deterministic.
-- [ ] First-party features can register into slots without direct host coupling.
-
+- [x] Slot contracts are implemented for block/view/panel/widget layers.
+- [x] Slot rendering order and fallback rules are deterministic.
+- [x] First-party features can register into slots without direct host coupling.
