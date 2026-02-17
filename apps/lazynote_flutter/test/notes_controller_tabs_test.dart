@@ -20,6 +20,11 @@ rust_api.NoteItem _note({
 
 NotesController _buildController({
   required Map<String, rust_api.NoteItem> store,
+  Future<rust_api.WorkspaceActionResponse> Function({
+    required String nodeId,
+    required String mode,
+  })?
+  workspaceDeleteFolderInvoker,
   Future<rust_api.NoteResponse> Function({
     required String atomId,
     required String content,
@@ -79,6 +84,15 @@ NotesController _buildController({
             errorCode: null,
             message: 'ok',
             note: updated,
+          );
+        },
+    workspaceDeleteFolderInvoker:
+        workspaceDeleteFolderInvoker ??
+        ({required nodeId, required mode}) async {
+          return const rust_api.WorkspaceActionResponse(
+            ok: true,
+            errorCode: null,
+            message: 'ok',
           );
         },
   );
@@ -302,5 +316,82 @@ void main() {
     expect(closed, isFalse);
     expect(controller.openNoteIds, ['note-1', 'note-2']);
     expect(controller.activeNoteId, 'note-2');
+  });
+
+  test(
+    'workspace delete_all refreshes and removes deleted active tab',
+    () async {
+      final store = <String, rust_api.NoteItem>{
+        'note-1': _note(atomId: 'note-1', content: '# first', updatedAt: 2),
+        'note-2': _note(atomId: 'note-2', content: '# second', updatedAt: 1),
+      };
+      final deleteCalls = <String>[];
+      final controller = _buildController(
+        store: store,
+        workspaceDeleteFolderInvoker: ({required nodeId, required mode}) async {
+          deleteCalls.add('$nodeId::$mode');
+          store.remove('note-2');
+          return const rust_api.WorkspaceActionResponse(
+            ok: true,
+            errorCode: null,
+            message: 'ok',
+          );
+        },
+      );
+      addTearDown(controller.dispose);
+
+      await controller.loadNotes();
+      await controller.openNoteFromExplorer('note-2');
+      expect(controller.activeNoteId, 'note-2');
+
+      final result = await controller.deleteWorkspaceFolder(
+        folderId: '11111111-1111-4111-8111-111111111111',
+        mode: 'delete_all',
+      );
+
+      expect(result.ok, isTrue);
+      expect(deleteCalls, ['11111111-1111-4111-8111-111111111111::delete_all']);
+      expect(controller.openNoteIds, ['note-1']);
+      expect(controller.activeNoteId, 'note-1');
+    },
+  );
+
+  test('workspace delete is blocked when draft flush fails', () async {
+    final store = <String, rust_api.NoteItem>{
+      'note-1': _note(atomId: 'note-1', content: '# first', updatedAt: 2),
+    };
+    var deleteInvoked = false;
+    final controller = _buildController(
+      store: store,
+      noteUpdateInvoker: ({required atomId, required content}) async {
+        return const rust_api.NoteResponse(
+          ok: false,
+          errorCode: 'db_error',
+          message: 'write failed',
+          note: null,
+        );
+      },
+      workspaceDeleteFolderInvoker: ({required nodeId, required mode}) async {
+        deleteInvoked = true;
+        return const rust_api.WorkspaceActionResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+        );
+      },
+    );
+    addTearDown(controller.dispose);
+
+    await controller.loadNotes();
+    controller.updateActiveDraft('# changed');
+
+    final result = await controller.deleteWorkspaceFolder(
+      folderId: '11111111-1111-4111-8111-111111111111',
+      mode: 'dissolve',
+    );
+
+    expect(result.ok, isFalse);
+    expect(result.errorCode, 'save_blocked');
+    expect(deleteInvoked, isFalse);
   });
 }

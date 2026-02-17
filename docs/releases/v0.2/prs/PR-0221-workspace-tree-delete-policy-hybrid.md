@@ -1,7 +1,7 @@
 # PR-0221-workspace-tree-delete-policy-hybrid
 
 - Proposed title: `feat(workspace-core): hybrid delete policy for note and folder`
-- Status: In Progress (M1-M2 completed)
+- Status: In Progress (M1-M3 completed)
 
 ## Goal
 
@@ -186,6 +186,16 @@ Exit criteria:
 - `flutter analyze` passes
 - `flutter test` passes
 - widget/integration tests cover delete mode flows
+
+Completion snapshot:
+
+- [x] Added folder delete mode chooser UI (`dissolve` / `delete_all`) in Notes Explorer.
+- [x] Wired Flutter to call `workspace_delete_folder(node_id, mode)` via controller.
+- [x] Added post-delete refresh path aligned with filtered-read semantics.
+- [x] Added open-tab reconciliation after workspace delete to keep pane state coherent.
+- [x] Added regression tests:
+  - controller test for delete-all tab reconciliation
+  - widget test for mode chooser -> FFI mode value wiring
 
 ### M4. Documentation and Closure
 

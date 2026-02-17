@@ -365,6 +365,12 @@ class _NotesPageState extends State<NotesPage>
                                       ),
                                     );
                                 },
+                                onDeleteFolderRequested: (folderId, mode) {
+                                  return _controller.deleteWorkspaceFolder(
+                                    folderId: folderId,
+                                    mode: mode,
+                                  );
+                                },
                               ),
                             ),
                             const VerticalDivider(

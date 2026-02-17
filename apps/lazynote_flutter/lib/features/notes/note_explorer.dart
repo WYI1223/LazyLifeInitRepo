@@ -13,6 +13,7 @@ class ExplorerFolderNode {
     required this.label,
     this.children = const <ExplorerFolderNode>[],
     this.noteIds = const <String>[],
+    this.deletable = true,
   });
 
   /// Stable node id used by future tree operations.
@@ -26,7 +27,21 @@ class ExplorerFolderNode {
 
   /// Note ids attached to this folder node.
   final List<String> noteIds;
+
+  /// Whether this folder should expose delete action in explorer UI.
+  final bool deletable;
 }
+
+/// Async folder-delete callback from explorer to controller layer.
+typedef ExplorerFolderDeleteInvoker =
+    Future<rust_api.WorkspaceActionResponse> Function(
+      String folderId,
+      String mode,
+    );
+
+/// Optional tree builder hook for tests/future workspace integration.
+typedef ExplorerFolderTreeBuilder =
+    List<ExplorerFolderNode> Function(NotesController controller);
 
 /// Left explorer panel for notes navigation.
 class NoteExplorer extends StatefulWidget {
@@ -35,6 +50,8 @@ class NoteExplorer extends StatefulWidget {
     required this.controller,
     required this.onOpenNoteRequested,
     required this.onCreateNoteRequested,
+    this.onDeleteFolderRequested,
+    this.folderTreeBuilder,
   });
 
   /// Source controller that provides list/tree state snapshots.
@@ -45,6 +62,12 @@ class NoteExplorer extends StatefulWidget {
 
   /// Callback emitted when user requests creating one note.
   final Future<void> Function() onCreateNoteRequested;
+
+  /// Optional callback emitted when user requests deleting one folder.
+  final ExplorerFolderDeleteInvoker? onDeleteFolderRequested;
+
+  /// Optional custom folder tree builder.
+  final ExplorerFolderTreeBuilder? folderTreeBuilder;
 
   @override
   State<NoteExplorer> createState() => _NoteExplorerState();
@@ -58,6 +81,9 @@ const double _scrollThickness = 4;
 
 class _NoteExplorerState extends State<NoteExplorer> {
   final ScrollController _listScrollController = ScrollController();
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  );
   @override
   void dispose() {
     _listScrollController.dispose();
@@ -289,17 +315,22 @@ class _NoteExplorerState extends State<NoteExplorer> {
   }
 
   List<ExplorerFolderNode> _buildFolderTree() {
+    if (widget.folderTreeBuilder case final builder?) {
+      return builder(widget.controller);
+    }
     // v0.1 one-level structure while keeping recursive model for future folders.
     final noteIds = widget.controller.items.map((item) => item.atomId).toList();
     return <ExplorerFolderNode>[
       ExplorerFolderNode(
         id: 'private',
         label: 'Private',
+        deletable: false,
         children: <ExplorerFolderNode>[
           ExplorerFolderNode(
             id: 'private/all',
             label: 'All Notes',
             noteIds: noteIds,
+            deletable: false,
           ),
         ],
       ),
@@ -312,6 +343,10 @@ class _NoteExplorerState extends State<NoteExplorer> {
     required ExplorerFolderNode node,
     required int depth,
   }) {
+    final canDelete =
+        widget.onDeleteFolderRequested != null &&
+        node.deletable &&
+        _looksLikeUuid(node.id);
     rows.add(
       Padding(
         padding: EdgeInsets.fromLTRB(10 + depth * 12, 6, 10, 2),
@@ -323,13 +358,45 @@ class _NoteExplorerState extends State<NoteExplorer> {
               color: kNotesSecondaryText,
             ),
             const SizedBox(width: 6),
-            Text(
-              node.label,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: kNotesSecondaryText,
-                fontWeight: depth == 0 ? FontWeight.w700 : FontWeight.w600,
+            Expanded(
+              child: Text(
+                node.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: kNotesSecondaryText,
+                  fontWeight: depth == 0 ? FontWeight.w700 : FontWeight.w600,
+                ),
               ),
             ),
+            if (canDelete)
+              IconButton(
+                key: Key('notes_folder_delete_button_${node.id}'),
+                tooltip: 'Delete folder',
+                onPressed: widget.controller.workspaceDeleteInFlight
+                    ? null
+                    : () => _showDeleteFolderDialog(context, node),
+                constraints: const BoxConstraints.tightFor(
+                  width: 22,
+                  height: 22,
+                ),
+                padding: EdgeInsets.zero,
+                visualDensity: VisualDensity.compact,
+                icon: widget.controller.workspaceDeleteInFlight
+                    ? const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.4,
+                          color: kNotesSecondaryText,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.delete_outline,
+                        size: 14,
+                        color: kNotesSecondaryText,
+                      ),
+              ),
           ],
         ),
       ),
@@ -354,6 +421,140 @@ class _NoteExplorerState extends State<NoteExplorer> {
       );
     }
   }
+
+  bool _looksLikeUuid(String value) {
+    return _uuidPattern.hasMatch(value.trim());
+  }
+
+  Future<void> _showDeleteFolderDialog(
+    BuildContext context,
+    ExplorerFolderNode node,
+  ) async {
+    final invoker = widget.onDeleteFolderRequested;
+    if (invoker == null) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+
+    final selectedMode = await showDialog<_FolderDeleteMode>(
+      context: context,
+      builder: (dialogContext) {
+        var mode = _FolderDeleteMode.dissolve;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Delete folder'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    node.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _FolderDeleteMode.values
+                        .map(
+                          (entry) => ChoiceChip(
+                            key: Key(
+                              'notes_folder_delete_mode_${entry.wireValue}',
+                            ),
+                            label: Text(entry.label),
+                            selected: mode == entry,
+                            onSelected: (_) {
+                              setState(() {
+                                mode = entry;
+                              });
+                            },
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    mode.description,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: kNotesSecondaryText),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.tonal(
+                  key: const Key('notes_folder_delete_confirm_button'),
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop(mode);
+                  },
+                  child: const Text('Confirm'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (selectedMode == null || !mounted) {
+      return;
+    }
+
+    final response = await invoker(node.id, selectedMode.wireValue);
+    if (!mounted) {
+      return;
+    }
+    if (response.ok) {
+      messenger
+        ?..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text('Folder deleted with ${selectedMode.wireValue}.'),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      return;
+    }
+
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(response.message),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+  }
+}
+
+enum _FolderDeleteMode { dissolve, deleteAll }
+
+extension on _FolderDeleteMode {
+  String get wireValue => switch (this) {
+    _FolderDeleteMode.dissolve => 'dissolve',
+    _FolderDeleteMode.deleteAll => 'delete_all',
+  };
+
+  String get label => switch (this) {
+    _FolderDeleteMode.dissolve => 'Dissolve',
+    _FolderDeleteMode.deleteAll => 'Delete all',
+  };
+
+  String get description => switch (this) {
+    _FolderDeleteMode.dissolve => 'Keep notes, move direct children to root.',
+    _FolderDeleteMode.deleteAll =>
+      'Delete folder subtree references and scoped notes.',
+  };
 }
 
 class _ExplorerNoteRow extends StatelessWidget {

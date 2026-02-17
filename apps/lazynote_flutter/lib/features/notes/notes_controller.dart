@@ -38,6 +38,13 @@ typedef NoteSetTagsInvoker =
       required List<String> tags,
     });
 
+/// Async workspace folder delete mutator.
+typedef WorkspaceDeleteFolderInvoker =
+    Future<rust_api.WorkspaceActionResponse> Function({
+      required String nodeId,
+      required String mode,
+    });
+
 /// Timer factory for autosave debounce scheduling.
 typedef DebounceTimerFactory =
     Timer Function(Duration duration, void Function() callback);
@@ -103,6 +110,7 @@ class NotesController extends ChangeNotifier {
     NoteUpdateInvoker? noteUpdateInvoker,
     TagsListInvoker? tagsListInvoker,
     NoteSetTagsInvoker? noteSetTagsInvoker,
+    WorkspaceDeleteFolderInvoker? workspaceDeleteFolderInvoker,
     DebounceTimerFactory? debounceTimerFactory,
     NotesPrepare? prepare,
     this.listLimit = 50,
@@ -113,6 +121,8 @@ class NotesController extends ChangeNotifier {
        _noteUpdateInvoker = noteUpdateInvoker ?? _defaultNoteUpdateInvoker,
        _tagsListInvoker = tagsListInvoker ?? _defaultTagsListInvoker,
        _noteSetTagsInvoker = noteSetTagsInvoker ?? _defaultNoteSetTagsInvoker,
+       _workspaceDeleteFolderInvoker =
+           workspaceDeleteFolderInvoker ?? _defaultWorkspaceDeleteFolderInvoker,
        _debounceTimerFactory = debounceTimerFactory ?? Timer.new,
        _prepare = prepare ?? _defaultPrepare;
 
@@ -122,6 +132,7 @@ class NotesController extends ChangeNotifier {
   final NoteUpdateInvoker _noteUpdateInvoker;
   final TagsListInvoker _tagsListInvoker;
   final NoteSetTagsInvoker _noteSetTagsInvoker;
+  final WorkspaceDeleteFolderInvoker _workspaceDeleteFolderInvoker;
   final DebounceTimerFactory _debounceTimerFactory;
   final NotesPrepare _prepare;
 
@@ -169,6 +180,8 @@ class NotesController extends ChangeNotifier {
   final Map<String, Future<void>> _tagMutationQueueByAtomId =
       <String, Future<void>>{};
   String? _switchBlockErrorMessage;
+  bool _workspaceDeleteInFlight = false;
+  String? _workspaceDeleteErrorMessage;
 
   int _listRequestId = 0;
   int _detailRequestId = 0;
@@ -224,6 +237,12 @@ class NotesController extends ChangeNotifier {
 
   /// Whether contextual create-tag apply is currently in flight.
   bool get createTagApplyInFlight => _createTagApplyFuture != null;
+
+  /// Whether workspace folder delete request is currently in flight.
+  bool get workspaceDeleteInFlight => _workspaceDeleteInFlight;
+
+  /// Last workspace folder delete failure message.
+  String? get workspaceDeleteErrorMessage => _workspaceDeleteErrorMessage;
 
   /// Returns and clears the latest non-fatal create warning.
   String? takeCreateWarningMessage() {
@@ -386,6 +405,91 @@ class NotesController extends ChangeNotifier {
 
   /// Handles open-note request from explorer shell.
   Future<bool> openNoteFromExplorer(String atomId) => selectNote(atomId);
+
+  /// Deletes one workspace folder by explicit mode, then refreshes UI state.
+  ///
+  /// Contract:
+  /// - `mode` must be `dissolve` or `delete_all`.
+  /// - Flushes active draft before mutation to avoid local data loss.
+  /// - Refreshes list and reconciles open tabs after successful delete.
+  Future<rust_api.WorkspaceActionResponse> deleteWorkspaceFolder({
+    required String folderId,
+    required String mode,
+  }) async {
+    if (_workspaceDeleteInFlight) {
+      return rust_api.WorkspaceActionResponse(
+        ok: false,
+        errorCode: 'busy',
+        message: 'Workspace delete is already in progress.',
+      );
+    }
+
+    final normalizedFolderId = folderId.trim();
+    if (normalizedFolderId.isEmpty) {
+      return rust_api.WorkspaceActionResponse(
+        ok: false,
+        errorCode: 'invalid_node_id',
+        message: 'Folder id is required.',
+      );
+    }
+    final normalizedMode = mode.trim();
+    if (normalizedMode != 'dissolve' && normalizedMode != 'delete_all') {
+      return rust_api.WorkspaceActionResponse(
+        ok: false,
+        errorCode: 'invalid_delete_mode',
+        message: 'Delete mode must be dissolve or delete_all.',
+      );
+    }
+
+    final flushed = await flushPendingSave();
+    if (!flushed) {
+      return rust_api.WorkspaceActionResponse(
+        ok: false,
+        errorCode: 'save_blocked',
+        message: 'Save failed. Retry or back up content before folder delete.',
+      );
+    }
+
+    _workspaceDeleteInFlight = true;
+    _workspaceDeleteErrorMessage = null;
+    notifyListeners();
+
+    try {
+      await _prepare();
+      final response = await _workspaceDeleteFolderInvoker(
+        nodeId: normalizedFolderId,
+        mode: normalizedMode,
+      );
+      if (!response.ok) {
+        _workspaceDeleteErrorMessage = _envelopeError(
+          errorCode: response.errorCode,
+          message: response.message,
+          fallback: 'Failed to delete workspace folder.',
+        );
+        return response;
+      }
+
+      await _loadNotes(
+        resetSession: false,
+        preserveActiveWhenFilteredOut: true,
+        refreshTags: false,
+      );
+      await _reconcileOpenTabsAfterWorkspaceMutation();
+      _workspaceDeleteErrorMessage = null;
+      return response;
+    } catch (error) {
+      final message = 'Workspace folder delete failed unexpectedly: $error';
+      _workspaceDeleteErrorMessage = message;
+      return rust_api.WorkspaceActionResponse(
+        ok: false,
+        errorCode: 'internal_error',
+        message: message,
+      );
+    } finally {
+      _workspaceDeleteInFlight = false;
+      notifyListeners();
+    }
+  }
 
   /// Flushes pending save work for the currently active note.
   ///
@@ -680,6 +784,90 @@ class NotesController extends ChangeNotifier {
       }
       await Future.wait(snapshot.map((future) => future.catchError((_) {})));
     }
+  }
+
+  Future<void> _reconcileOpenTabsAfterWorkspaceMutation() async {
+    if (_openNoteIds.isEmpty) {
+      return;
+    }
+
+    final openSnapshot = List<String>.from(_openNoteIds);
+    final removedAtomIds = <String>[];
+    for (final atomId in openSnapshot) {
+      try {
+        final response = await _noteGetInvoker(atomId: atomId);
+        if (!response.ok) {
+          if (response.errorCode == 'note_not_found') {
+            removedAtomIds.add(atomId);
+          }
+          continue;
+        }
+        if (response.note case final note?) {
+          _insertOrReplaceListItem(note, updatePersisted: true);
+        }
+      } catch (_) {
+        // Keep tab state unchanged when detail check fails unexpectedly.
+      }
+    }
+
+    if (removedAtomIds.isEmpty) {
+      return;
+    }
+
+    final previousActiveId = _activeNoteId;
+    final previousActiveIndex = previousActiveId == null
+        ? -1
+        : openSnapshot.indexOf(previousActiveId);
+    final activeRemoved =
+        previousActiveId != null && removedAtomIds.contains(previousActiveId);
+
+    _openNoteIds.removeWhere(removedAtomIds.contains);
+    for (final atomId in removedAtomIds) {
+      _evictNoteState(atomId);
+    }
+
+    if (_openNoteIds.isEmpty) {
+      _activeNoteId = null;
+      _selectedNote = null;
+      _detailLoading = false;
+      _detailErrorMessage = null;
+      _activeDraftAtomId = null;
+      _activeDraftContent = '';
+      _autosaveTimer?.cancel();
+      _setSaveState(NoteSaveState.clean);
+      notifyListeners();
+      return;
+    }
+
+    if (!activeRemoved) {
+      notifyListeners();
+      return;
+    }
+
+    final fallbackIndex = previousActiveIndex <= 0
+        ? 0
+        : (previousActiveIndex - 1).clamp(0, _openNoteIds.length - 1);
+    final fallbackId = _openNoteIds[fallbackIndex];
+    _activeNoteId = fallbackId;
+    _selectedNote = noteById(fallbackId);
+    _activeDraftAtomId = fallbackId;
+    _activeDraftContent =
+        _draftContentByAtomId[fallbackId] ?? _selectedNote?.content ?? '';
+    _refreshSaveStateForActive();
+    _requestEditorFocus();
+    notifyListeners();
+    await _loadSelectedDetail(atomId: fallbackId);
+  }
+
+  void _evictNoteState(String atomId) {
+    _noteCache.remove(atomId);
+    _draftContentByAtomId.remove(atomId);
+    _persistedContentByAtomId.remove(atomId);
+    _draftVersionByAtomId.remove(atomId);
+    _saveFutureByAtomId.remove(atomId);
+    _saveQueuedByAtomId.remove(atomId);
+    _tagSaveInFlightAtomIds.remove(atomId);
+    _tagMutationQueueByAtomId.remove(atomId);
   }
 
   Future<void> _awaitCreateTagApply({Duration? timeout}) async {
@@ -1625,6 +1813,13 @@ Future<rust_api.NoteResponse> _defaultNoteSetTagsInvoker({
   required List<String> tags,
 }) {
   return rust_api.noteSetTags(atomId: atomId, tags: tags);
+}
+
+Future<rust_api.WorkspaceActionResponse> _defaultWorkspaceDeleteFolderInvoker({
+  required String nodeId,
+  required String mode,
+}) {
+  return rust_api.workspaceDeleteFolder(nodeId: nodeId, mode: mode);
 }
 
 Future<void> _defaultPrepare() async {
