@@ -82,7 +82,7 @@ const double _scrollThickness = 4;
 class _NoteExplorerState extends State<NoteExplorer> {
   final ScrollController _listScrollController = ScrollController();
   static final RegExp _uuidPattern = RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
   );
   @override
   void dispose() {

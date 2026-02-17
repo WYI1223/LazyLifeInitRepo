@@ -1,7 +1,7 @@
 # PR-0221-workspace-tree-delete-policy-hybrid
 
 - Proposed title: `feat(workspace-core): hybrid delete policy for note and folder`
-- Status: In Progress (M1-M3 completed)
+- Status: In Progress (M1-M3 completed, M4 pending)
 
 ## Goal
 
@@ -196,6 +196,9 @@ Completion snapshot:
 - [x] Added regression tests:
   - controller test for delete-all tab reconciliation
   - widget test for mode chooser -> FFI mode value wiring
+- [x] Reachability note: current delete-mode UI is pre-wired for UUID-backed
+  workspace folders; full user-visible reachability depends on
+  `PR-0203` + `PR-0205` (+ context-action lane `PR-0207`).
 
 ### M4. Documentation and Closure
 

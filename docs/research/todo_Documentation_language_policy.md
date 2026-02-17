@@ -1,4 +1,4 @@
-﻿## TODO: Documentation language policy (canonical = English)
+## TODO: Documentation language policy (canonical = English)
 
 ## Release/PR Mapping (2026-02-14)
 
