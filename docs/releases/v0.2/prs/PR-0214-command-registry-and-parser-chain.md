@@ -1,7 +1,7 @@
 # PR-0214-command-registry-and-parser-chain
 
 - Proposed title: `feat(entry): command registry and parser chain baseline`
-- Status: Planned
+- Status: In Progress (Flutter baseline implemented; pending review)
 
 ## Goal
 
@@ -30,10 +30,9 @@ Out of scope:
 
 ## Planned File Changes
 
-- [edit] `apps/lazynote_flutter/lib/features/entry/*`
-- [add] `crates/lazynote_core/src/entry/command_registry.rs`
-- [add] `crates/lazynote_core/src/entry/parser_chain.rs`
-- [edit] `crates/lazynote_ffi/src/api.rs`
+- [edit] `apps/lazynote_flutter/lib/features/entry/command_parser.dart`
+- [add] `apps/lazynote_flutter/lib/features/entry/command_registry.dart`
+- [edit] `apps/lazynote_flutter/lib/features/entry/single_entry_controller.dart`
 - [add] `apps/lazynote_flutter/test/entry_registry_parser_chain_test.dart`
 
 ## Dependencies
@@ -42,12 +41,28 @@ Out of scope:
 
 ## Verification
 
-- `cargo test --all`
+- `flutter analyze`
 - `flutter test`
+
+Completion snapshot:
+
+- [x] Added parser chain contract with:
+  - namespaced parser ids
+  - priority ordering and deterministic short-circuit
+  - timeout budget handling (`parser_timeout`)
+  - duplicate parser-id conflict error
+- [x] Added command registry contract with:
+  - namespaced command ids
+  - duplicate command-id conflict error
+  - action-label lookup for detail payloads
+- [x] Migrated Single Entry command execution from hardcoded switch to registry dispatch.
+- [x] Added parser/registry regression tests in `entry_registry_parser_chain_test.dart`.
+- [x] Verification passed:
+  - `flutter analyze`
+  - `flutter test`
 
 ## Acceptance Criteria
 
-- [ ] First-party commands are loaded via registry, not hardcoded switch flow.
-- [ ] Parser chain ordering and timeout behavior are deterministic and tested.
-- [ ] Duplicate registration conflicts return explicit errors.
-
+- [x] First-party commands are loaded via registry, not hardcoded switch flow.
+- [x] Parser chain ordering and timeout behavior are deterministic and tested.
+- [x] Duplicate registration conflicts return explicit errors.

@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
 import 'package:lazynote_flutter/core/rust_bridge.dart';
 import 'package:lazynote_flutter/features/entry/command_parser.dart';
+import 'package:lazynote_flutter/features/entry/command_registry.dart';
 import 'package:lazynote_flutter/features/entry/command_router.dart';
 import 'package:lazynote_flutter/features/entry/entry_state.dart';
 
@@ -51,6 +52,7 @@ class SingleEntryController extends ChangeNotifier {
   /// - Injected invokers/hooks are intended for tests and diagnostics.
   SingleEntryController({
     CommandRouter? router,
+    EntryCommandRegistry? commandRegistry,
     EntrySearchInvoker? searchInvoker,
     EntryCreateNoteInvoker? createNoteInvoker,
     EntryCreateTaskInvoker? createTaskInvoker,
@@ -60,9 +62,6 @@ class SingleEntryController extends ChangeNotifier {
     Duration searchDebounce = const Duration(milliseconds: 150),
   }) : _router = router ?? const CommandRouter(),
        _searchInvoker = searchInvoker ?? _defaultEntrySearch,
-       _createNoteInvoker = createNoteInvoker ?? _defaultEntryCreateNote,
-       _createTaskInvoker = createTaskInvoker ?? _defaultEntryCreateTask,
-       _scheduleInvoker = scheduleInvoker ?? _defaultEntrySchedule,
        _prepareSearch =
            // Why: when tests inject a custom search invoker we should not
            // implicitly touch real bridge/bootstrap side effects unless
@@ -78,15 +77,20 @@ class SingleEntryController extends ChangeNotifier {
                    scheduleInvoker != null
                ? _noopPrepareCommand
                : _defaultPrepareCommand),
-       _searchDebounce = searchDebounce {
+       _searchDebounce = searchDebounce,
+       _commandRegistry =
+           commandRegistry ??
+           EntryCommandRegistry.firstParty(
+             createNoteInvoker: createNoteInvoker ?? _defaultEntryCreateNote,
+             createTaskInvoker: createTaskInvoker ?? _defaultEntryCreateTask,
+             scheduleInvoker: scheduleInvoker ?? _defaultEntrySchedule,
+           ) {
     inputFocusNode.addListener(_handleFocusChanged);
   }
 
   final CommandRouter _router;
   final EntrySearchInvoker _searchInvoker;
-  final EntryCreateNoteInvoker _createNoteInvoker;
-  final EntryCreateTaskInvoker _createTaskInvoker;
-  final EntryScheduleInvoker _scheduleInvoker;
+  final EntryCommandRegistry _commandRegistry;
   final EntrySearchPrepare _prepareSearch;
   final EntryCommandPrepare _prepareCommand;
   final Duration _searchDebounce;
@@ -463,16 +467,7 @@ class SingleEntryController extends ChangeNotifier {
   }
 
   Future<rust_api.EntryActionResponse> _executeCommand(EntryCommand command) {
-    return switch (command) {
-      NewNoteCommand(:final content) => _createNoteInvoker(content: content),
-      CreateTaskCommand(:final content) => _createTaskInvoker(content: content),
-      ScheduleCommand(:final title, :final start, :final end) =>
-        _scheduleInvoker(
-          title: title,
-          startEpochMs: start.millisecondsSinceEpoch,
-          endEpochMs: end?.millisecondsSinceEpoch,
-        ),
-    };
+    return _commandRegistry.execute(command);
   }
 
   String _commandResultDetail({
@@ -507,11 +502,7 @@ class SingleEntryController extends ChangeNotifier {
   }
 
   String _actionLabel(EntryCommand command) {
-    return switch (command) {
-      NewNoteCommand() => 'new_note',
-      CreateTaskCommand() => 'create_task',
-      ScheduleCommand() => 'schedule',
-    };
+    return _commandRegistry.actionLabelFor(command.commandId);
   }
 
   String _searchDetailPayload({
