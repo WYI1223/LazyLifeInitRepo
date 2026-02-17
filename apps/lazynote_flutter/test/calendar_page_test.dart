@@ -11,9 +11,7 @@ void main() {
     return MaterialApp(home: Scaffold(body: child));
   }
 
-  rust_api.AtomListResponse successResponse(
-    List<rust_api.AtomListItem> items,
-  ) {
+  rust_api.AtomListResponse successResponse(List<rust_api.AtomListItem> items) {
     return rust_api.AtomListResponse(
       ok: true,
       errorCode: null,
@@ -45,9 +43,9 @@ void main() {
           successResponse(const []),
     );
 
-    await tester.pumpWidget(wrapWithMaterial(CalendarPage(
-      controller: controller,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(CalendarPage(controller: controller)),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -70,9 +68,9 @@ void main() {
       initialDate: DateTime(2026, 2, 15), // Sunday → week of Feb 9
     );
 
-    await tester.pumpWidget(wrapWithMaterial(CalendarPage(
-      controller: controller,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(CalendarPage(controller: controller)),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -89,9 +87,7 @@ void main() {
     expect(find.textContaining('Feb 16'), findsOneWidget);
   });
 
-  testWidgets('error state renders error message', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('error state renders error message', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(largeSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -101,9 +97,9 @@ void main() {
           errorResponse('Database connection failed'),
     );
 
-    await tester.pumpWidget(wrapWithMaterial(CalendarPage(
-      controller: controller,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(CalendarPage(controller: controller)),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -124,10 +120,14 @@ void main() {
           successResponse(const []),
     );
 
-    await tester.pumpWidget(wrapWithMaterial(CalendarPage(
-      controller: controller,
-      onBackToWorkbench: () => backPressed = true,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(
+        CalendarPage(
+          controller: controller,
+          onBackToWorkbench: () => backPressed = true,
+        ),
+      ),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -137,9 +137,7 @@ void main() {
     expect(backPressed, isTrue);
   });
 
-  testWidgets('createEvent triggers reload', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('createEvent triggers reload', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(largeSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -150,22 +148,19 @@ void main() {
         rangeCallCount++;
         return successResponse(const []);
       },
-      scheduleInvoker: ({
-        required title,
-        required startEpochMs,
-        endEpochMs,
-      }) async {
-        return rust_api.EntryActionResponse(
-          ok: true,
-          atomId: 'new-evt-1',
-          message: 'ok',
-        );
-      },
+      scheduleInvoker:
+          ({required title, required startEpochMs, endEpochMs}) async {
+            return rust_api.EntryActionResponse(
+              ok: true,
+              atomId: 'new-evt-1',
+              message: 'ok',
+            );
+          },
     );
 
-    await tester.pumpWidget(wrapWithMaterial(CalendarPage(
-      controller: controller,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(CalendarPage(controller: controller)),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -182,9 +177,7 @@ void main() {
     expect(rangeCallCount, greaterThan(countBefore));
   });
 
-  testWidgets('updateEvent triggers reload', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('updateEvent triggers reload', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(largeSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
@@ -195,22 +188,19 @@ void main() {
         rangeCallCount++;
         return successResponse(const []);
       },
-      updateEventInvoker: ({
-        required atomId,
-        required startMs,
-        required endMs,
-      }) async {
-        return rust_api.EntryActionResponse(
-          ok: true,
-          atomId: atomId,
-          message: 'ok',
-        );
-      },
+      updateEventInvoker:
+          ({required atomId, required startMs, required endMs}) async {
+            return rust_api.EntryActionResponse(
+              ok: true,
+              atomId: atomId,
+              message: 'ok',
+            );
+          },
     );
 
-    await tester.pumpWidget(wrapWithMaterial(CalendarPage(
-      controller: controller,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(CalendarPage(controller: controller)),
+    );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

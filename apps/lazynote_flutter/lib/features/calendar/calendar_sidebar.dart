@@ -75,10 +75,9 @@ class _CalendarSidebarState extends State<CalendarSidebar> {
               ),
               calendarStyle: CalendarStyle(
                 todayDecoration: BoxDecoration(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .primary
-                      .withValues(alpha: 0.2),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 todayTextStyle: TextStyle(
@@ -101,9 +100,9 @@ class _CalendarSidebarState extends State<CalendarSidebar> {
                   fontSize: 13,
                 ),
                 outsideTextStyle: TextStyle(
-                  color: calendarSecondaryTextColor(context).withValues(
-                    alpha: 0.4,
-                  ),
+                  color: calendarSecondaryTextColor(
+                    context,
+                  ).withValues(alpha: 0.4),
                   fontSize: 13,
                 ),
               ),

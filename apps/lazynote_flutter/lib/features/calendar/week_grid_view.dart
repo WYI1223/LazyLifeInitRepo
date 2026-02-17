@@ -35,7 +35,10 @@ class WeekGridView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        _DayHeaderRow(key: const Key('week_grid_day_headers'), weekStart: weekStart),
+        _DayHeaderRow(
+          key: const Key('week_grid_day_headers'),
+          weekStart: weekStart,
+        ),
         const Divider(height: 1, thickness: 1),
         Expanded(
           child: SingleChildScrollView(
@@ -115,10 +118,7 @@ class _DayHeaderRow extends StatelessWidget {
           width: 28,
           height: 28,
           decoration: isToday
-              ? BoxDecoration(
-                  color: primaryColor,
-                  shape: BoxShape.circle,
-                )
+              ? BoxDecoration(color: primaryColor, shape: BoxShape.circle)
               : null,
           alignment: Alignment.center,
           child: Text(
@@ -171,10 +171,8 @@ class _GridBody extends StatelessWidget {
                 return GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTapUp: onEmptySlotTap != null
-                      ? (details) => _handleGridTap(
-                            details.localPosition,
-                            columnWidth,
-                          )
+                      ? (details) =>
+                            _handleGridTap(details.localPosition, columnWidth)
                       : null,
                   child: Stack(
                     children: [
@@ -234,10 +232,12 @@ class _GridBody extends StatelessWidget {
         }
 
         // Clamp to this day's boundaries
-        final blockStartMs = startDt.millisecondsSinceEpoch < dayStart.millisecondsSinceEpoch
+        final blockStartMs =
+            startDt.millisecondsSinceEpoch < dayStart.millisecondsSinceEpoch
             ? dayStart.millisecondsSinceEpoch
             : startDt.millisecondsSinceEpoch;
-        final blockEndMs = endDt.millisecondsSinceEpoch > dayEnd.millisecondsSinceEpoch
+        final blockEndMs =
+            endDt.millisecondsSinceEpoch > dayEnd.millisecondsSinceEpoch
             ? dayEnd.millisecondsSinceEpoch
             : endDt.millisecondsSinceEpoch;
 
@@ -248,7 +248,9 @@ class _GridBody extends StatelessWidget {
 
         final top = (msFromDayStart / msPerHour) * kCalendarHourHeight;
         final height = (blockDurationMs / msPerHour) * kCalendarHourHeight;
-        final effectiveHeight = height < _minBlockHeight ? _minBlockHeight : height;
+        final effectiveHeight = height < _minBlockHeight
+            ? _minBlockHeight
+            : height;
 
         final left = dayIndex * columnWidth + 2;
         final blockWidth = columnWidth - 4;
@@ -324,7 +326,9 @@ class _GridLines extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lineColor = calendarSecondaryTextColor(context).withValues(alpha: 0.15);
+    final lineColor = calendarSecondaryTextColor(
+      context,
+    ).withValues(alpha: 0.15);
 
     return CustomPaint(
       size: Size(columnWidth * 7, totalHeight),

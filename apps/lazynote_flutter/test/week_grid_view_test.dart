@@ -8,9 +8,7 @@ void main() {
 
   Widget wrapWithMaterial(Widget child) {
     return MaterialApp(
-      home: Scaffold(
-        body: SizedBox(width: 800, height: 700, child: child),
-      ),
+      home: Scaffold(body: SizedBox(width: 800, height: 700, child: child)),
     );
   }
 
@@ -42,10 +40,9 @@ void main() {
     // Monday Feb 9, 2026
     final weekStart = DateTime(2026, 2, 9);
 
-    await tester.pumpWidget(wrapWithMaterial(WeekGridView(
-      weekStart: weekStart,
-      events: const [],
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(WeekGridView(weekStart: weekStart, events: const [])),
+    );
     await tester.pump();
 
     expect(find.byKey(const Key('week_grid_day_headers')), findsOneWidget);
@@ -90,34 +87,27 @@ void main() {
       ),
     ];
 
-    await tester.pumpWidget(wrapWithMaterial(WeekGridView(
-      weekStart: weekStart,
-      events: events,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(WeekGridView(weekStart: weekStart, events: events)),
+    );
     await tester.pump();
 
     // Event block should exist with its key
-    expect(
-      find.byKey(const Key('event_block_evt-1_day1')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('event_block_evt-1_day1')), findsOneWidget);
 
     // Preview text should render
     expect(find.text('Team standup meeting'), findsOneWidget);
   });
 
-  testWidgets('time axis shows hour labels', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('time axis shows hour labels', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(largeSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final weekStart = DateTime(2026, 2, 9);
 
-    await tester.pumpWidget(wrapWithMaterial(WeekGridView(
-      weekStart: weekStart,
-      events: const [],
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(WeekGridView(weekStart: weekStart, events: const [])),
+    );
     await tester.pump();
 
     expect(find.byKey(const Key('week_grid_time_axis')), findsOneWidget);
@@ -128,18 +118,15 @@ void main() {
     expect(find.text('12:00'), findsOneWidget);
   });
 
-  testWidgets('grid lines are painted', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('grid lines are painted', (WidgetTester tester) async {
     await tester.binding.setSurfaceSize(largeSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final weekStart = DateTime(2026, 2, 9);
 
-    await tester.pumpWidget(wrapWithMaterial(WeekGridView(
-      weekStart: weekStart,
-      events: const [],
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(WeekGridView(weekStart: weekStart, events: const [])),
+    );
     await tester.pump();
 
     expect(find.byKey(const Key('week_grid_lines')), findsOneWidget);
@@ -164,10 +151,9 @@ void main() {
       ),
     ];
 
-    await tester.pumpWidget(wrapWithMaterial(WeekGridView(
-      weekStart: weekStart,
-      events: events,
-    )));
+    await tester.pumpWidget(
+      wrapWithMaterial(WeekGridView(weekStart: weekStart, events: events)),
+    );
     await tester.pump();
 
     expect(find.byKey(const Key('event_block_evt-2_day0')), findsOneWidget);

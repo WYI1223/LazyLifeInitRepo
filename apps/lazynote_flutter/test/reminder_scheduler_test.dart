@@ -38,76 +38,80 @@ void main() {
   }
 
   group('ReminderScheduler time-matrix scheduling', () {
-    test('DDL task: [NULL, Value] schedules reminder 15 min before end_at',
-        () async {
-      final deadlineMs =
-          DateTime(2026, 2, 20, 10, 0).millisecondsSinceEpoch;
-      final atom = atomItem(
-        atomId: 'ddl-1',
-        content: 'Submit report',
-        endAt: deadlineMs,
-      );
+    test(
+      'DDL task: [NULL, Value] schedules reminder 15 min before end_at',
+      () async {
+        final deadlineMs = DateTime(2026, 2, 20, 10, 0).millisecondsSinceEpoch;
+        final atom = atomItem(
+          atomId: 'ddl-1',
+          content: 'Submit report',
+          endAt: deadlineMs,
+        );
 
-      await ReminderScheduler.scheduleRemindersForAtoms([atom]);
+        await ReminderScheduler.scheduleRemindersForAtoms([atom]);
 
-      expect(mockService.scheduled.length, 1);
-      final notification = mockService.scheduled.first;
+        expect(mockService.scheduled.length, 1);
+        final notification = mockService.scheduled.first;
 
-      final expectedTime = DateTime.fromMillisecondsSinceEpoch(deadlineMs)
-          .subtract(const Duration(minutes: 15));
-      expect(notification.scheduledTime.hour, expectedTime.hour);
-      expect(notification.scheduledTime.minute, expectedTime.minute);
-      expect(notification.body, contains('Deadline'));
-    });
+        final expectedTime = DateTime.fromMillisecondsSinceEpoch(
+          deadlineMs,
+        ).subtract(const Duration(minutes: 15));
+        expect(notification.scheduledTime.hour, expectedTime.hour);
+        expect(notification.scheduledTime.minute, expectedTime.minute);
+        expect(notification.body, contains('Deadline'));
+      },
+    );
 
-    test('Ongoing task: [Value, NULL] schedules reminder at start_at',
-        () async {
-      final startMs = DateTime(2026, 2, 20, 9, 0).millisecondsSinceEpoch;
-      final atom = atomItem(
-        atomId: 'ongoing-1',
-        content: 'Work on project',
-        startAt: startMs,
-      );
+    test(
+      'Ongoing task: [Value, NULL] schedules reminder at start_at',
+      () async {
+        final startMs = DateTime(2026, 2, 20, 9, 0).millisecondsSinceEpoch;
+        final atom = atomItem(
+          atomId: 'ongoing-1',
+          content: 'Work on project',
+          startAt: startMs,
+        );
 
-      await ReminderScheduler.scheduleRemindersForAtoms([atom]);
+        await ReminderScheduler.scheduleRemindersForAtoms([atom]);
 
-      expect(mockService.scheduled.length, 1);
-      final notification = mockService.scheduled.first;
+        expect(mockService.scheduled.length, 1);
+        final notification = mockService.scheduled.first;
 
-      final expectedTime = DateTime.fromMillisecondsSinceEpoch(startMs);
-      expect(notification.scheduledTime.hour, expectedTime.hour);
-      expect(notification.scheduledTime.minute, expectedTime.minute);
-      expect(notification.body, contains('Task starting'));
-    });
+        final expectedTime = DateTime.fromMillisecondsSinceEpoch(startMs);
+        expect(notification.scheduledTime.hour, expectedTime.hour);
+        expect(notification.scheduledTime.minute, expectedTime.minute);
+        expect(notification.body, contains('Task starting'));
+      },
+    );
 
-    test('Event: [Value, Value] schedules reminder 15 min before start_at',
-        () async {
-      final startMs = DateTime(2026, 2, 20, 14, 0).millisecondsSinceEpoch;
-      final endMs = DateTime(2026, 2, 20, 15, 0).millisecondsSinceEpoch;
-      final atom = atomItem(
-        atomId: 'event-1',
-        content: 'Team meeting',
-        startAt: startMs,
-        endAt: endMs,
-      );
+    test(
+      'Event: [Value, Value] schedules reminder 15 min before start_at',
+      () async {
+        final startMs = DateTime(2026, 2, 20, 14, 0).millisecondsSinceEpoch;
+        final endMs = DateTime(2026, 2, 20, 15, 0).millisecondsSinceEpoch;
+        final atom = atomItem(
+          atomId: 'event-1',
+          content: 'Team meeting',
+          startAt: startMs,
+          endAt: endMs,
+        );
 
-      await ReminderScheduler.scheduleRemindersForAtoms([atom]);
+        await ReminderScheduler.scheduleRemindersForAtoms([atom]);
 
-      expect(mockService.scheduled.length, 1);
-      final notification = mockService.scheduled.first;
+        expect(mockService.scheduled.length, 1);
+        final notification = mockService.scheduled.first;
 
-      final expectedTime = DateTime.fromMillisecondsSinceEpoch(startMs)
-          .subtract(const Duration(minutes: 15));
-      expect(notification.scheduledTime.hour, expectedTime.hour);
-      expect(notification.scheduledTime.minute, expectedTime.minute);
-      expect(notification.body, contains('Event starting'));
-    });
+        final expectedTime = DateTime.fromMillisecondsSinceEpoch(
+          startMs,
+        ).subtract(const Duration(minutes: 15));
+        expect(notification.scheduledTime.hour, expectedTime.hour);
+        expect(notification.scheduledTime.minute, expectedTime.minute);
+        expect(notification.body, contains('Event starting'));
+      },
+    );
 
     test('Timeless: [NULL, NULL] does not schedule reminder', () async {
-      final atom = atomItem(
-        atomId: 'note-1',
-        content: 'Just a thought',
-      );
+      final atom = atomItem(atomId: 'note-1', content: 'Just a thought');
 
       await ReminderScheduler.scheduleRemindersForAtoms([atom]);
 
@@ -116,24 +120,30 @@ void main() {
 
     test('multiple atoms with different time-matrix types', () async {
       final now = DateTime.now();
-      final ddlDeadline =
-          now.add(const Duration(hours: 2)).millisecondsSinceEpoch;
-      final ongoingStart =
-          now.add(const Duration(hours: 1)).millisecondsSinceEpoch;
-      final eventStart =
-          now.add(const Duration(hours: 3)).millisecondsSinceEpoch;
-      final eventEnd =
-          now.add(const Duration(hours: 4)).millisecondsSinceEpoch;
+      final ddlDeadline = now
+          .add(const Duration(hours: 2))
+          .millisecondsSinceEpoch;
+      final ongoingStart = now
+          .add(const Duration(hours: 1))
+          .millisecondsSinceEpoch;
+      final eventStart = now
+          .add(const Duration(hours: 3))
+          .millisecondsSinceEpoch;
+      final eventEnd = now.add(const Duration(hours: 4)).millisecondsSinceEpoch;
 
       await ReminderScheduler.scheduleRemindersForAtoms([
         atomItem(atomId: 'ddl', content: 'Deadline task', endAt: ddlDeadline),
         atomItem(
-            atomId: 'ongoing', content: 'Ongoing task', startAt: ongoingStart),
+          atomId: 'ongoing',
+          content: 'Ongoing task',
+          startAt: ongoingStart,
+        ),
         atomItem(
-            atomId: 'event',
-            content: 'Meeting',
-            startAt: eventStart,
-            endAt: eventEnd),
+          atomId: 'event',
+          content: 'Meeting',
+          startAt: eventStart,
+          endAt: eventEnd,
+        ),
         atomItem(atomId: 'note', content: 'Just a note'),
       ]);
 
@@ -167,8 +177,10 @@ void main() {
       ]);
 
       expect(mockService.scheduled.length, 2);
-      expect(mockService.scheduled[0].id,
-          isNot(equals(mockService.scheduled[1].id)));
+      expect(
+        mockService.scheduled[0].id,
+        isNot(equals(mockService.scheduled[1].id)),
+      );
     });
   });
 
@@ -238,8 +250,7 @@ void main() {
 
   group('ReminderScheduler body shows actual time', () {
     test('DDL body shows deadline time, not reminder time', () async {
-      final deadlineMs =
-          DateTime(2026, 2, 20, 10, 0).millisecondsSinceEpoch;
+      final deadlineMs = DateTime(2026, 2, 20, 10, 0).millisecondsSinceEpoch;
       final atom = atomItem(
         atomId: 'ddl-body',
         content: 'Report due',

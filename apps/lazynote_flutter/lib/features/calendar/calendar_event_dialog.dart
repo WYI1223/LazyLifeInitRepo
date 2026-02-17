@@ -59,7 +59,9 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
       _titleController = TextEditingController(
         text: item.previewText ?? item.content.split('\n').first,
       );
-      final startDt = DateTime.fromMillisecondsSinceEpoch(item.startAt!.toInt());
+      final startDt = DateTime.fromMillisecondsSinceEpoch(
+        item.startAt!.toInt(),
+      );
       final endDt = DateTime.fromMillisecondsSinceEpoch(item.endAt!.toInt());
       _selectedDate = DateTime(startDt.year, startDt.month, startDt.day);
       _startTime = TimeOfDay(hour: startDt.hour, minute: startDt.minute);
@@ -80,8 +82,13 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
   }
 
   int _timeToMs(DateTime date, TimeOfDay time) {
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute)
-        .millisecondsSinceEpoch;
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    ).millisecondsSinceEpoch;
   }
 
   void _submit() {
@@ -98,9 +105,9 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
       return;
     }
 
-    Navigator.of(context).pop(
-      CalendarEventResult(title: title, startMs: startMs, endMs: endMs),
-    );
+    Navigator.of(
+      context,
+    ).pop(CalendarEventResult(title: title, startMs: startMs, endMs: endMs));
   }
 
   Future<void> _pickDate() async {
@@ -136,8 +143,18 @@ class _CalendarEventDialogState extends State<CalendarEventDialog> {
   }
 
   static const _monthNames = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
 
   String _formatDate(DateTime d) =>

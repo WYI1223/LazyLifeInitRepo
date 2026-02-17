@@ -8,7 +8,14 @@ import 'package:lazynote_flutter/features/notes/notes_page.dart';
 import 'package:lazynote_flutter/features/tasks/tasks_page.dart';
 
 /// Left-pane sections inside Workbench shell.
-enum WorkbenchSection { home, notes, tasks, calendar, settings, rustDiagnostics }
+enum WorkbenchSection {
+  home,
+  notes,
+  tasks,
+  calendar,
+  settings,
+  rustDiagnostics,
+}
 
 /// Default shell page used to validate new features before wiring final UIs.
 ///

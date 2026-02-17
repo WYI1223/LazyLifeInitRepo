@@ -14,24 +14,26 @@ void main() {
     DateTime? initialDate,
     int initialHour = 9,
   }) async {
-    await tester.pumpWidget(wrapWithMaterial(
-      Builder(
-        builder: (context) => FilledButton(
-          key: const Key('open_dialog'),
-          onPressed: () {
-            showDialog<CalendarEventResult>(
-              context: context,
-              builder: (_) => CalendarEventDialog(
-                existingItem: existingItem,
-                initialDate: initialDate ?? DateTime(2026, 2, 16),
-                initialHour: initialHour,
-              ),
-            );
-          },
-          child: const Text('Open'),
+    await tester.pumpWidget(
+      wrapWithMaterial(
+        Builder(
+          builder: (context) => FilledButton(
+            key: const Key('open_dialog'),
+            onPressed: () {
+              showDialog<CalendarEventResult>(
+                context: context,
+                builder: (_) => CalendarEventDialog(
+                  existingItem: existingItem,
+                  initialDate: initialDate ?? DateTime(2026, 2, 16),
+                  initialHour: initialHour,
+                ),
+              );
+            },
+            child: const Text('Open'),
+          ),
         ),
       ),
-    ));
+    );
     await tester.pump();
     await tester.tap(find.byKey(const Key('open_dialog')));
     await tester.pumpAndSettle();
@@ -126,15 +128,10 @@ void main() {
     expect(find.byKey(const Key('calendar_event_dialog')), findsNothing);
   });
 
-  testWidgets('date and time pickers are present', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('date and time pickers are present', (WidgetTester tester) async {
     await openDialog(tester, initialHour: 9);
 
-    expect(
-      find.byKey(const Key('calendar_event_date_picker')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('calendar_event_date_picker')), findsOneWidget);
     expect(
       find.byKey(const Key('calendar_event_start_time_picker')),
       findsOneWidget,
