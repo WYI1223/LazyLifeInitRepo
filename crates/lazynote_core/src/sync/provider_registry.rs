@@ -257,6 +257,11 @@ mod tests {
             invalid,
             Err(ProviderRegistryError::InvalidProviderId(_))
         ));
+        let blank = registry.register(Arc::new(MockProvider::new("   ")));
+        assert!(matches!(
+            blank,
+            Err(ProviderRegistryError::InvalidProviderId(_))
+        ));
 
         registry
             .register(Arc::new(MockProvider::new("google_calendar")))
@@ -278,6 +283,71 @@ mod tests {
             })
             .expect_err("without active provider pull should fail");
         assert_eq!(err.code, "provider_not_selected");
+    }
+
+    #[test]
+    fn select_active_accepts_trimmed_input_and_normalizes_storage() {
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register(Arc::new(MockProvider::new("google_calendar")))
+            .expect("provider should register");
+
+        registry
+            .select_active("  google_calendar  ")
+            .expect("trimmed provider id should be selectable");
+        assert_eq!(registry.active_provider_id(), Some("google_calendar"));
+    }
+
+    #[test]
+    fn can_reselect_active_provider() {
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register(Arc::new(MockProvider::new("google_calendar")))
+            .expect("google provider should register");
+        registry
+            .register(Arc::new(MockProvider::new("microsoft_todo")))
+            .expect("microsoft provider should register");
+
+        registry
+            .select_active("google_calendar")
+            .expect("google provider should select");
+        assert_eq!(registry.active_provider_id(), Some("google_calendar"));
+
+        registry
+            .select_active("microsoft_todo")
+            .expect("microsoft provider should select");
+        assert_eq!(registry.active_provider_id(), Some("microsoft_todo"));
+    }
+
+    #[test]
+    fn active_operations_fail_after_clear_active() {
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register(Arc::new(MockProvider::new("google_calendar")))
+            .expect("provider should register");
+        registry
+            .select_active("google_calendar")
+            .expect("provider should select");
+
+        registry.clear_active();
+        let err = registry
+            .pull_active(ProviderPullRequest {
+                cursor: None,
+                limit: 10,
+            })
+            .expect_err("active operations should fail after clear_active");
+        assert_eq!(err.code, "provider_not_selected");
+    }
+
+    #[test]
+    fn get_trims_input_and_returns_none_for_blank_value() {
+        let mut registry = ProviderRegistry::new();
+        registry
+            .register(Arc::new(MockProvider::new("google_calendar")))
+            .expect("provider should register");
+
+        assert!(registry.get("  google_calendar  ").is_some());
+        assert!(registry.get("   ").is_none());
     }
 
     #[test]

@@ -76,8 +76,10 @@ No token or payload content is included.
 `ProviderRegistry` responsibilities:
 
 - validate provider id shape and reject invalid IDs
+  - v0.2 id format: `[a-z0-9_-]+`
 - reject duplicate provider registrations
 - support explicit active-provider selection
+  - `register/select_active/get` normalize input by `trim()`
 - provide active-operation hooks (`auth_active/pull_active/push_active/conflict_map_active`)
 - return explicit `provider_not_selected` envelope when active provider is not set
 
@@ -86,4 +88,3 @@ No token or payload content is included.
 - v0.2 baseline is in-process and contract-focused.
 - FFI exposure of provider SPI is intentionally deferred until concrete provider
   integration requirements are finalized.
-

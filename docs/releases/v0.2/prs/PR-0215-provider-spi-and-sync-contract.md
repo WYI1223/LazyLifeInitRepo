@@ -65,6 +65,10 @@ Completion snapshot:
   - `provider_not_selected` error envelope for active operations
   - `crates/lazynote_core/src/sync/provider_registry.rs`
 - [x] Added provider adapter compliance tests in registry module.
+  - covers invalid/blank provider ids
+  - covers trimmed `select_active` behavior
+  - covers reselecting active provider
+  - covers `clear_active` -> active operation error path
 - [x] Exported sync contracts from core crate root:
   - `crates/lazynote_core/src/lib.rs`
 - [x] Added architecture docs:
