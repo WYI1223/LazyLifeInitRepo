@@ -3,6 +3,8 @@
 
 /// Database open/migration APIs.
 pub mod db;
+/// Extension kernel declaration contracts.
+pub mod extension;
 /// Structured logging initialization and status APIs.
 pub mod logging;
 /// Canonical Atom data model.
@@ -14,6 +16,16 @@ pub mod search;
 /// Use-case orchestration services.
 pub mod service;
 
+/// Re-export extension kernel contracts.
+pub use extension::kernel::{
+    ExtensionAdapter, ExtensionHealth, ExtensionKernelError, ExtensionRegistry, ExtensionSource,
+    FirstPartyExtensionAdapter, RegisteredExtension,
+};
+/// Re-export extension manifest contracts.
+pub use extension::manifest::{
+    supported_capabilities, ExtensionManifest, ManifestEntrypoints, ManifestValidationError,
+    CAPABILITY_COMMAND, CAPABILITY_PARSER, CAPABILITY_PROVIDER, CAPABILITY_UI_SLOT,
+};
 /// Re-export logging entry points for FFI/UI layers.
 pub use logging::{default_log_level, init_logging, logging_status};
 /// Re-export canonical Atom model types.

@@ -10,6 +10,11 @@ The following are treated as compatibility-sensitive:
 - Dart-visible FFI models in `apps/lazynote_flutter/lib/core/bindings/api.dart`
 - behavior contracts documented in `docs/api/*.md`
 
+Architecture contract docs are also compatibility-sensitive for internal
+integration lanes:
+
+- `docs/architecture/extension-kernel.md` (PR-0213 baseline)
+
 ## Breaking Changes
 
 A change is considered breaking when any of the following happens:
@@ -35,6 +40,13 @@ For compatibility-sensitive changes, PR must include:
 2. tests updated for old/new behavior expectations
 3. release note update in `docs/releases/`
 4. migration guidance if callers must change
+
+For internal architecture contracts (for example extension kernel contracts),
+PRs must include:
+
+1. updated architecture contract doc
+2. validation/registry tests for changed invariants
+3. release plan status sync in `docs/releases/`
 
 ## v0.x Practical Rule
 
