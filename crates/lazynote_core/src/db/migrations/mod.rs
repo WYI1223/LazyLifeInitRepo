@@ -51,6 +51,10 @@ const MIGRATIONS: &[Migration] = &[
         version: 7,
         sql: include_str!("0007_workspace_tree.sql"),
     },
+    Migration {
+        version: 8,
+        sql: include_str!("0008_workspace_tree_delete_policy.sql"),
+    },
 ];
 
 /// Returns the latest migration version known by this binary.

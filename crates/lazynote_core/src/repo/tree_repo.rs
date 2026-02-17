@@ -30,6 +30,8 @@ pub enum TreeRepoError {
     Db(DbError),
     /// Target workspace node does not exist or is soft-deleted.
     NodeNotFound(WorkspaceNodeId),
+    /// Target workspace node exists but is not folder kind.
+    NodeNotFolder(WorkspaceNodeId),
     /// Connection schema is not at the expected migrated version.
     UninitializedConnection {
         expected_version: u32,
@@ -51,6 +53,7 @@ impl Display for TreeRepoError {
         match self {
             Self::Db(err) => write!(f, "{err}"),
             Self::NodeNotFound(id) => write!(f, "workspace node not found: {id}"),
+            Self::NodeNotFolder(id) => write!(f, "workspace node is not a folder: {id}"),
             Self::UninitializedConnection {
                 expected_version,
                 actual_version,
@@ -75,6 +78,7 @@ impl Error for TreeRepoError {
         match self {
             Self::Db(err) => Some(err),
             Self::NodeNotFound(_) => None,
+            Self::NodeNotFolder(_) => None,
             Self::UninitializedConnection { .. } => None,
             Self::MissingRequiredTable(_) => None,
             Self::MissingRequiredColumn { .. } => None,
@@ -163,6 +167,10 @@ pub trait TreeRepository {
         new_parent_uuid: Option<WorkspaceNodeId>,
         target_order: Option<i64>,
     ) -> TreeRepoResult<()>;
+    /// Deletes one folder by dissolving it into root-level children.
+    fn delete_folder_dissolve(&self, folder_uuid: WorkspaceNodeId) -> TreeRepoResult<()>;
+    /// Deletes one folder subtree and conditionally soft-deletes note atoms.
+    fn delete_folder_delete_all(&self, folder_uuid: WorkspaceNodeId) -> TreeRepoResult<()>;
     /// Loads atom type for active atom, if present.
     fn atom_kind(&self, atom_uuid: AtomId) -> TreeRepoResult<Option<AtomType>>;
 }
@@ -242,7 +250,7 @@ impl TreeRepository for SqliteTreeRepository<'_> {
         node_uuid: WorkspaceNodeId,
         include_deleted: bool,
     ) -> TreeRepoResult<Option<WorkspaceNode>> {
-        let mut stmt = self.conn.prepare(
+        let sql = if include_deleted {
             "SELECT
                 node_uuid,
                 kind,
@@ -254,10 +262,29 @@ impl TreeRepository for SqliteTreeRepository<'_> {
                 created_at,
                 updated_at
              FROM workspace_nodes
-             WHERE node_uuid = ?1
-               AND (?2 = 1 OR is_deleted = 0);",
-        )?;
-        let mut rows = stmt.query(params![node_uuid.to_string(), bool_to_int(include_deleted)])?;
+             WHERE node_uuid = ?1;"
+        } else {
+            "SELECT
+                n.node_uuid AS node_uuid,
+                n.kind AS kind,
+                n.parent_uuid AS parent_uuid,
+                n.atom_uuid AS atom_uuid,
+                n.display_name AS display_name,
+                n.sort_order AS sort_order,
+                n.is_deleted AS is_deleted,
+                n.created_at AS created_at,
+                n.updated_at AS updated_at
+             FROM workspace_nodes n
+             LEFT JOIN atoms a ON a.uuid = n.atom_uuid
+             WHERE n.node_uuid = ?1
+               AND n.is_deleted = 0
+               AND (
+                 n.kind = 'folder'
+                 OR (n.kind = 'note_ref' AND a.type = 'note' AND a.is_deleted = 0)
+               );"
+        };
+        let mut stmt = self.conn.prepare(sql)?;
+        let mut rows = stmt.query([node_uuid.to_string()])?;
         if let Some(row) = rows.next()? {
             return Ok(Some(parse_workspace_node_row(row)?));
         }
@@ -285,22 +312,6 @@ impl TreeRepository for SqliteTreeRepository<'_> {
                  WHERE parent_uuid = ?1
                  ORDER BY sort_order ASC, node_uuid ASC;"
             }
-            (true, false) => {
-                "SELECT
-                    node_uuid,
-                    kind,
-                    parent_uuid,
-                    atom_uuid,
-                    display_name,
-                    sort_order,
-                    is_deleted,
-                    created_at,
-                    updated_at
-                 FROM workspace_nodes
-                 WHERE parent_uuid = ?1
-                   AND is_deleted = 0
-                 ORDER BY sort_order ASC, node_uuid ASC;"
-            }
             (false, true) => {
                 "SELECT
                     node_uuid,
@@ -316,21 +327,47 @@ impl TreeRepository for SqliteTreeRepository<'_> {
                  WHERE parent_uuid IS NULL
                  ORDER BY sort_order ASC, node_uuid ASC;"
             }
+            (true, false) => {
+                "SELECT
+                    n.node_uuid AS node_uuid,
+                    n.kind AS kind,
+                    n.parent_uuid AS parent_uuid,
+                    n.atom_uuid AS atom_uuid,
+                    n.display_name AS display_name,
+                    n.sort_order AS sort_order,
+                    n.is_deleted AS is_deleted,
+                    n.created_at AS created_at,
+                    n.updated_at AS updated_at
+                 FROM workspace_nodes n
+                 LEFT JOIN atoms a ON a.uuid = n.atom_uuid
+                 WHERE n.parent_uuid = ?1
+                   AND n.is_deleted = 0
+                   AND (
+                     n.kind = 'folder'
+                     OR (n.kind = 'note_ref' AND a.type = 'note' AND a.is_deleted = 0)
+                   )
+                 ORDER BY n.sort_order ASC, n.node_uuid ASC;"
+            }
             (false, false) => {
                 "SELECT
-                    node_uuid,
-                    kind,
-                    parent_uuid,
-                    atom_uuid,
-                    display_name,
-                    sort_order,
-                    is_deleted,
-                    created_at,
-                    updated_at
-                 FROM workspace_nodes
-                 WHERE parent_uuid IS NULL
-                   AND is_deleted = 0
-                 ORDER BY sort_order ASC, node_uuid ASC;"
+                    n.node_uuid AS node_uuid,
+                    n.kind AS kind,
+                    n.parent_uuid AS parent_uuid,
+                    n.atom_uuid AS atom_uuid,
+                    n.display_name AS display_name,
+                    n.sort_order AS sort_order,
+                    n.is_deleted AS is_deleted,
+                    n.created_at AS created_at,
+                    n.updated_at AS updated_at
+                 FROM workspace_nodes n
+                 LEFT JOIN atoms a ON a.uuid = n.atom_uuid
+                 WHERE n.parent_uuid IS NULL
+                   AND n.is_deleted = 0
+                   AND (
+                     n.kind = 'folder'
+                     OR (n.kind = 'note_ref' AND a.type = 'note' AND a.is_deleted = 0)
+                   )
+                 ORDER BY n.sort_order ASC, n.node_uuid ASC;"
             }
         };
 
@@ -401,6 +438,76 @@ impl TreeRepository for SqliteTreeRepository<'_> {
                  WHERE node_uuid = ?1
                    AND is_deleted = 0;",
                 params![id.to_string(), index as i64],
+            )?;
+        }
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn delete_folder_dissolve(&self, folder_uuid: WorkspaceNodeId) -> TreeRepoResult<()> {
+        let tx = Transaction::new_unchecked(self.conn, TransactionBehavior::Immediate)?;
+        ensure_active_folder_exists(&tx, folder_uuid)?;
+
+        let children = list_active_child_ids(&tx, Some(folder_uuid))?;
+        let base_order = next_sort_order(&tx, None)?;
+        for (index, child_uuid) in children.into_iter().enumerate() {
+            tx.execute(
+                "UPDATE workspace_nodes
+                 SET parent_uuid = NULL,
+                     sort_order = ?2,
+                     updated_at = (strftime('%s', 'now') * 1000)
+                 WHERE node_uuid = ?1
+                   AND is_deleted = 0;",
+                params![child_uuid.to_string(), base_order + index as i64],
+            )?;
+        }
+
+        tx.execute(
+            "UPDATE workspace_nodes
+             SET is_deleted = 1,
+                 updated_at = (strftime('%s', 'now') * 1000)
+             WHERE node_uuid = ?1
+               AND kind = 'folder'
+               AND is_deleted = 0;",
+            [folder_uuid.to_string()],
+        )?;
+
+        tx.commit()?;
+        Ok(())
+    }
+
+    fn delete_folder_delete_all(&self, folder_uuid: WorkspaceNodeId) -> TreeRepoResult<()> {
+        let tx = Transaction::new_unchecked(self.conn, TransactionBehavior::Immediate)?;
+        ensure_active_folder_exists(&tx, folder_uuid)?;
+
+        let referenced_atoms = list_referenced_note_atoms_in_subtree(&tx, folder_uuid)?;
+        soft_delete_workspace_subtree(&tx, folder_uuid)?;
+
+        for atom_uuid in referenced_atoms {
+            let has_other_active_refs: i64 = tx.query_row(
+                "SELECT EXISTS(
+                    SELECT 1
+                    FROM workspace_nodes
+                    WHERE kind = 'note_ref'
+                      AND atom_uuid = ?1
+                      AND is_deleted = 0
+                );",
+                [atom_uuid.to_string()],
+                |row| row.get(0),
+            )?;
+            if has_other_active_refs == 1 {
+                continue;
+            }
+
+            tx.execute(
+                "UPDATE atoms
+                 SET is_deleted = 1,
+                     updated_at = (strftime('%s', 'now') * 1000)
+                 WHERE uuid = ?1
+                   AND type = 'note'
+                   AND is_deleted = 0;",
+                [atom_uuid.to_string()],
             )?;
         }
 
@@ -517,6 +624,87 @@ fn next_sort_order(conn: &Connection, parent_uuid: Option<WorkspaceNodeId>) -> T
     Ok(next)
 }
 
+fn ensure_active_folder_exists(
+    conn: &Connection,
+    folder_uuid: WorkspaceNodeId,
+) -> TreeRepoResult<()> {
+    let kind: Option<String> = conn
+        .query_row(
+            "SELECT kind
+             FROM workspace_nodes
+             WHERE node_uuid = ?1
+               AND is_deleted = 0;",
+            [folder_uuid.to_string()],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    match kind.as_deref() {
+        None => Err(TreeRepoError::NodeNotFound(folder_uuid)),
+        Some("folder") => Ok(()),
+        Some(_) => Err(TreeRepoError::NodeNotFolder(folder_uuid)),
+    }
+}
+
+fn list_referenced_note_atoms_in_subtree(
+    conn: &Connection,
+    folder_uuid: WorkspaceNodeId,
+) -> TreeRepoResult<Vec<AtomId>> {
+    let mut stmt = conn.prepare(
+        "WITH RECURSIVE subtree(node_uuid) AS (
+            SELECT node_uuid
+            FROM workspace_nodes
+            WHERE node_uuid = ?1
+              AND is_deleted = 0
+            UNION ALL
+            SELECT child.node_uuid
+            FROM workspace_nodes child
+            INNER JOIN subtree parent ON child.parent_uuid = parent.node_uuid
+            WHERE child.is_deleted = 0
+        )
+        SELECT DISTINCT nodes.atom_uuid
+        FROM workspace_nodes nodes
+        INNER JOIN subtree ON subtree.node_uuid = nodes.node_uuid
+        WHERE nodes.kind = 'note_ref'
+          AND nodes.is_deleted = 0
+          AND nodes.atom_uuid IS NOT NULL;",
+    )?;
+
+    let mut rows = stmt.query([folder_uuid.to_string()])?;
+    let mut result = Vec::new();
+    while let Some(row) = rows.next()? {
+        let atom_uuid_text: String = row.get(0)?;
+        result.push(parse_uuid(&atom_uuid_text, "workspace_nodes.atom_uuid")?);
+    }
+    Ok(result)
+}
+
+fn soft_delete_workspace_subtree(
+    conn: &Connection,
+    folder_uuid: WorkspaceNodeId,
+) -> TreeRepoResult<()> {
+    conn.execute(
+        "WITH RECURSIVE subtree(node_uuid) AS (
+            SELECT node_uuid
+            FROM workspace_nodes
+            WHERE node_uuid = ?1
+              AND is_deleted = 0
+            UNION ALL
+            SELECT child.node_uuid
+            FROM workspace_nodes child
+            INNER JOIN subtree parent ON child.parent_uuid = parent.node_uuid
+            WHERE child.is_deleted = 0
+        )
+        UPDATE workspace_nodes
+        SET is_deleted = 1,
+            updated_at = (strftime('%s', 'now') * 1000)
+        WHERE node_uuid IN (SELECT node_uuid FROM subtree)
+          AND is_deleted = 0;",
+        [folder_uuid.to_string()],
+    )?;
+    Ok(())
+}
+
 fn parse_workspace_node_row(row: &Row<'_>) -> TreeRepoResult<WorkspaceNode> {
     let node_uuid_text: String = row.get("node_uuid")?;
     let node_uuid = parse_uuid(&node_uuid_text, "workspace_nodes.node_uuid")?;
@@ -571,14 +759,6 @@ fn parse_workspace_kind(value: &str) -> Option<WorkspaceNodeKind> {
 fn parse_uuid(value: &str, column: &'static str) -> TreeRepoResult<Uuid> {
     Uuid::parse_str(value)
         .map_err(|_| TreeRepoError::InvalidData(format!("invalid uuid `{value}` in {column}")))
-}
-
-fn bool_to_int(value: bool) -> i64 {
-    if value {
-        1
-    } else {
-        0
-    }
 }
 
 fn ensure_tree_connection_ready(conn: &Connection) -> TreeRepoResult<()> {

@@ -1,7 +1,7 @@
 use lazynote_core::db::open_db_in_memory;
 use lazynote_core::{
-    Atom, AtomRepository, AtomType, SqliteAtomRepository, SqliteTreeRepository, TreeService,
-    TreeServiceError, WorkspaceNodeKind,
+    Atom, AtomRepository, AtomType, FolderDeleteMode, SqliteAtomRepository, SqliteTreeRepository,
+    TreeService, TreeServiceError, WorkspaceNodeKind,
 };
 use uuid::Uuid;
 
@@ -195,7 +195,7 @@ fn create_folder_rejects_unknown_parent() {
 }
 
 #[test]
-fn referenced_note_cannot_be_demoted_or_soft_deleted() {
+fn deleted_note_reference_is_filtered_and_restores_on_atom_restore() {
     let conn = setup();
     let atom_repo = SqliteAtomRepository::try_new(&conn).unwrap();
     let tree_repo = SqliteTreeRepository::try_new(&conn).unwrap();
@@ -203,27 +203,151 @@ fn referenced_note_cannot_be_demoted_or_soft_deleted() {
 
     let note_atom = Atom::new(AtomType::Note, "note");
     insert_atom(&conn, &note_atom);
-    tree_service
-        .create_note_ref(None, note_atom.uuid, Some("ref".to_string()))
-        .unwrap();
-
-    let mut mutated = note_atom.clone();
-    mutated.kind = AtomType::Task;
-    let update_result = atom_repo.update_atom(&mutated);
-    assert!(update_result.is_err());
-
-    let delete_result = atom_repo.soft_delete_atom(note_atom.uuid);
-    assert!(delete_result.is_err());
-
-    let persisted: (String, i64) = conn
-        .query_row(
-            "SELECT type, is_deleted FROM atoms WHERE uuid = ?1;",
-            [note_atom.uuid.to_string()],
-            |row| Ok((row.get(0)?, row.get(1)?)),
+    let root = tree_service.create_folder(None, "Root").unwrap();
+    let note_ref = tree_service
+        .create_note_ref(
+            Some(root.node_uuid),
+            note_atom.uuid,
+            Some("ref".to_string()),
         )
         .unwrap();
-    assert_eq!(persisted.0, "note");
-    assert_eq!(persisted.1, 0);
+
+    let before_delete = tree_service.list_children(Some(root.node_uuid)).unwrap();
+    assert_eq!(before_delete.len(), 1);
+    assert_eq!(before_delete[0].node_uuid, note_ref.node_uuid);
+
+    atom_repo.soft_delete_atom(note_atom.uuid).unwrap();
+    let after_delete = tree_service.list_children(Some(root.node_uuid)).unwrap();
+    assert!(after_delete.is_empty());
+
+    let mut restored = atom_repo.get_atom(note_atom.uuid, true).unwrap().unwrap();
+    restored.is_deleted = false;
+    atom_repo.update_atom(&restored).unwrap();
+
+    let after_restore = tree_service.list_children(Some(root.node_uuid)).unwrap();
+    assert_eq!(after_restore.len(), 1);
+    assert_eq!(after_restore[0].node_uuid, note_ref.node_uuid);
+}
+
+#[test]
+fn delete_folder_dissolve_moves_direct_children_to_root() {
+    let conn = setup();
+    let tree_repo = SqliteTreeRepository::try_new(&conn).unwrap();
+    let service = TreeService::new(tree_repo);
+
+    let note_a = Atom::new(AtomType::Note, "A");
+    let note_b = Atom::new(AtomType::Note, "B");
+    insert_atom(&conn, &note_a);
+    insert_atom(&conn, &note_b);
+
+    let folder = service.create_folder(None, "Group").unwrap();
+    let direct_note_ref = service
+        .create_note_ref(
+            Some(folder.node_uuid),
+            note_a.uuid,
+            Some("Direct".to_string()),
+        )
+        .unwrap();
+    let child_folder = service
+        .create_folder(Some(folder.node_uuid), "ChildFolder")
+        .unwrap();
+    let nested_note_ref = service
+        .create_note_ref(
+            Some(child_folder.node_uuid),
+            note_b.uuid,
+            Some("Nested".to_string()),
+        )
+        .unwrap();
+
+    service
+        .delete_folder(folder.node_uuid, FolderDeleteMode::Dissolve)
+        .unwrap();
+
+    let root_children = service.list_children(None).unwrap();
+    let root_ids: Vec<_> = root_children.iter().map(|item| item.node_uuid).collect();
+    assert!(root_ids.contains(&direct_note_ref.node_uuid));
+    assert!(root_ids.contains(&child_folder.node_uuid));
+    assert!(!root_ids.contains(&folder.node_uuid));
+
+    let nested_children = service.list_children(Some(child_folder.node_uuid)).unwrap();
+    assert_eq!(nested_children.len(), 1);
+    assert_eq!(nested_children[0].node_uuid, nested_note_ref.node_uuid);
+}
+
+#[test]
+fn delete_folder_delete_all_soft_deletes_unique_atoms_only() {
+    let conn = setup();
+    let atom_repo = SqliteAtomRepository::try_new(&conn).unwrap();
+    let tree_repo = SqliteTreeRepository::try_new(&conn).unwrap();
+    let service = TreeService::new(tree_repo);
+
+    let note_only_in_target = Atom::new(AtomType::Note, "target-only");
+    let note_shared = Atom::new(AtomType::Note, "shared");
+    insert_atom(&conn, &note_only_in_target);
+    insert_atom(&conn, &note_shared);
+
+    let target_folder = service.create_folder(None, "Target").unwrap();
+    let other_folder = service.create_folder(None, "Other").unwrap();
+
+    service
+        .create_note_ref(
+            Some(target_folder.node_uuid),
+            note_only_in_target.uuid,
+            Some("target-only".to_string()),
+        )
+        .unwrap();
+    let shared_ref_in_target = service
+        .create_note_ref(
+            Some(target_folder.node_uuid),
+            note_shared.uuid,
+            Some("shared-target".to_string()),
+        )
+        .unwrap();
+    let shared_ref_in_other = service
+        .create_note_ref(
+            Some(other_folder.node_uuid),
+            note_shared.uuid,
+            Some("shared-other".to_string()),
+        )
+        .unwrap();
+
+    service
+        .delete_folder(target_folder.node_uuid, FolderDeleteMode::DeleteAll)
+        .unwrap();
+
+    let target_children_err = service
+        .list_children(Some(target_folder.node_uuid))
+        .unwrap_err();
+    assert!(matches!(
+        target_children_err,
+        TreeServiceError::ParentNotFound(id) if id == target_folder.node_uuid
+    ));
+
+    let root_children = service.list_children(None).unwrap();
+    let root_ids: Vec<_> = root_children.iter().map(|item| item.node_uuid).collect();
+    assert!(!root_ids.contains(&target_folder.node_uuid));
+    assert!(root_ids.contains(&other_folder.node_uuid));
+
+    let shared_in_other_children = service.list_children(Some(other_folder.node_uuid)).unwrap();
+    assert_eq!(shared_in_other_children.len(), 1);
+    assert_eq!(
+        shared_in_other_children[0].node_uuid,
+        shared_ref_in_other.node_uuid
+    );
+
+    let deleted_ref_in_target_visible = root_children
+        .iter()
+        .any(|item| item.node_uuid == shared_ref_in_target.node_uuid);
+    assert!(!deleted_ref_in_target_visible);
+
+    let only_target_atom = atom_repo
+        .get_atom(note_only_in_target.uuid, true)
+        .unwrap()
+        .unwrap();
+    assert!(only_target_atom.is_deleted);
+
+    let shared_atom = atom_repo.get_atom(note_shared.uuid, true).unwrap().unwrap();
+    assert!(!shared_atom.is_deleted);
 }
 
 #[test]

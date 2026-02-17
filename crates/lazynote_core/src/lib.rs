@@ -43,7 +43,7 @@ pub use service::note_service::{
 /// Re-export task/section service facade and models.
 pub use service::task_service::{SectionAtom, TaskService, TaskServiceError};
 /// Re-export workspace tree service facade and errors.
-pub use service::tree_service::{TreeService, TreeServiceError};
+pub use service::tree_service::{FolderDeleteMode, TreeService, TreeServiceError};
 
 /// Minimal health-check API for early integration.
 pub fn ping() -> &'static str {

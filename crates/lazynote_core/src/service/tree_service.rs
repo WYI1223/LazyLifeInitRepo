@@ -17,6 +17,15 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+/// Folder delete mode for workspace tree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FolderDeleteMode {
+    /// Delete folder node only and move direct children to root.
+    Dissolve,
+    /// Delete folder subtree and soft-delete note atoms with no remaining refs.
+    DeleteAll,
+}
+
 /// Errors from workspace tree service operations.
 #[derive(Debug)]
 pub enum TreeServiceError {
@@ -28,6 +37,8 @@ pub enum TreeServiceError {
     ParentNotFound(WorkspaceNodeId),
     /// Parent exists but is not folder kind.
     ParentMustBeFolder(WorkspaceNodeId),
+    /// Target node exists but is not folder kind.
+    NodeMustBeFolder(WorkspaceNodeId),
     /// Target note atom does not exist or is soft-deleted.
     AtomNotFound(AtomId),
     /// Target atom exists but is not note type.
@@ -50,6 +61,7 @@ impl Display for TreeServiceError {
             Self::ParentMustBeFolder(id) => {
                 write!(f, "workspace parent must be folder: {id}")
             }
+            Self::NodeMustBeFolder(id) => write!(f, "workspace node must be folder: {id}"),
             Self::AtomNotFound(id) => write!(f, "atom not found: {id}"),
             Self::AtomNotNote(id) => write!(f, "atom is not a note: {id}"),
             Self::CycleDetected {
@@ -77,6 +89,7 @@ impl From<TreeRepoError> for TreeServiceError {
     fn from(value: TreeRepoError) -> Self {
         match value {
             TreeRepoError::NodeNotFound(node_uuid) => Self::NodeNotFound(node_uuid),
+            TreeRepoError::NodeNotFolder(node_uuid) => Self::NodeMustBeFolder(node_uuid),
             other => Self::Repo(other),
         }
     }
@@ -190,6 +203,27 @@ impl<R: TreeRepository> TreeService<R> {
                 target_order.map(|value| value.max(0)),
             )
             .map_err(Into::into)
+    }
+
+    /// Deletes a folder by mode.
+    pub fn delete_folder(
+        &self,
+        folder_uuid: WorkspaceNodeId,
+        mode: FolderDeleteMode,
+    ) -> Result<(), TreeServiceError> {
+        let folder = self
+            .repo
+            .get_node(folder_uuid, false)?
+            .ok_or(TreeServiceError::NodeNotFound(folder_uuid))?;
+        if folder.kind != WorkspaceNodeKind::Folder {
+            return Err(TreeServiceError::NodeMustBeFolder(folder_uuid));
+        }
+
+        match mode {
+            FolderDeleteMode::Dissolve => self.repo.delete_folder_dissolve(folder_uuid)?,
+            FolderDeleteMode::DeleteAll => self.repo.delete_folder_delete_all(folder_uuid)?,
+        }
+        Ok(())
     }
 
     fn ensure_parent_is_folder(
