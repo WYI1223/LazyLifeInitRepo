@@ -1,7 +1,7 @@
 # PR-0203-tree-ffi-contracts
 
 - Proposed title: `feat(ffi): workspace tree API contracts and envelopes`
-- Status: In Progress (M1-M3 implemented; awaiting code review)
+- Status: Completed
 
 ## Goal
 
