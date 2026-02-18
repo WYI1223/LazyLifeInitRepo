@@ -141,7 +141,7 @@ class EntryParserChain {
         );
       }
 
-      final result = parser.tryParse(body);
+      final result = _tryParseSafely(parser: parser, body: body);
       if (result != null) {
         return result;
       }
@@ -158,6 +158,28 @@ class EntryParserChain {
       code: 'unknown_command',
       message: 'Unknown command. Supported: new note, task, schedule.',
     );
+  }
+
+  CommandParseResult? _tryParseSafely({
+    required EntryParserDefinition parser,
+    required String body,
+  }) {
+    try {
+      return parser.tryParse(body);
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[entry_parser] parser error '
+        '${parser.parserId}: $error',
+      );
+      assert(() {
+        debugPrintStack(
+          label: '[entry_parser] parser stack ${parser.parserId}',
+          stackTrace: stackTrace,
+        );
+        return true;
+      }());
+      return null;
+    }
   }
 }
 

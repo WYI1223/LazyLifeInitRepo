@@ -38,6 +38,10 @@ CommandParseResult? _fastTaskParser(String body) {
   return null;
 }
 
+CommandParseResult? _throwingParser(String body) {
+  throw StateError('parser crash');
+}
+
 void main() {
   test(
     'parser chain applies priority and short-circuits deterministically',
@@ -134,6 +138,59 @@ void main() {
     final result = parser.parse('> task hello');
     expect(result, isA<CommandParseFailure>());
     expect((result as CommandParseFailure).code, 'parser_timeout');
+  });
+
+  test(
+    'parser chain isolates throwing parser and keeps parsing next parser',
+    () {
+      final chain = EntryParserChain(
+        parsers: const <EntryParserDefinition>[
+          EntryParserDefinition(
+            parserId: 'test.throwing',
+            priority: 100,
+            tryParse: _throwingParser,
+          ),
+          EntryParserDefinition(
+            parserId: 'test.fast',
+            priority: 10,
+            tryParse: _fastTaskParser,
+          ),
+        ],
+      );
+      final parser = CommandParser(
+        chain: chain,
+        timeoutBudget: const Duration(milliseconds: 120),
+      );
+      final result = parser.parse('> task hello');
+      expect(result, isA<CommandParseSuccess>());
+      final command =
+          (result as CommandParseSuccess).command as CreateTaskCommand;
+      expect(command.content, 'fast');
+    },
+  );
+
+  test('parser chain returns unknown_command when all parsers throw', () {
+    final chain = EntryParserChain(
+      parsers: const <EntryParserDefinition>[
+        EntryParserDefinition(
+          parserId: 'test.throwing.a',
+          priority: 20,
+          tryParse: _throwingParser,
+        ),
+        EntryParserDefinition(
+          parserId: 'test.throwing.b',
+          priority: 10,
+          tryParse: _throwingParser,
+        ),
+      ],
+    );
+    final parser = CommandParser(
+      chain: chain,
+      timeoutBudget: const Duration(milliseconds: 120),
+    );
+    final result = parser.parse('> any command');
+    expect(result, isA<CommandParseFailure>());
+    expect((result as CommandParseFailure).code, 'unknown_command');
   });
 
   test('command registry rejects duplicate command ids', () {
