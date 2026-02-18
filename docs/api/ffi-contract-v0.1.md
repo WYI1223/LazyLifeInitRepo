@@ -75,7 +75,7 @@ For notes/tags contracts added in PR-0010B, see:
 
 ## Entry APIs
 
-### `entry_search(text, limit?) -> EntrySearchResponse`
+### `entry_search(text, kind?, limit?) -> EntrySearchResponse`
 
 - Blocking model: `async`
 - Threading: not UI-thread blocking by contract
@@ -85,6 +85,8 @@ For notes/tags contracts added in PR-0010B, see:
 - Semantics:
   - default limit: 10
   - max limit: 50
+  - `kind` accepted values: `all` | `note` | `task` | `event`
+  - `kind = null` or `all` means no type filter
   - response `applied_limit` must be used by UI as authoritative value
 
 ### `entry_create_note(content) -> EntryActionResponse`

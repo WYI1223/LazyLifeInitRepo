@@ -129,7 +129,7 @@ Recommended order:
    - migration numbering note: reserve `0008` for workspace policy; links uses `0009`
    - current priority (execution refinement):
      - `PR-0203` Workspace CRUD FFI parity is completed (create/list/rename/move + delete contract alignment)
-     - next: ship `entry_search(kind)` follow-up patch to remove search-type filter gap
+     - `entry_search(kind)` follow-up patch is completed (note/task/event/all filter + contract/test sync)
 2. Extension kernel lane:
    - `PR-0213-extension-kernel-contracts`
    - `PR-0214-command-registry-and-parser-chain`

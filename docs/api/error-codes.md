@@ -14,6 +14,7 @@ Producer: `crates/lazynote_ffi/src/api.rs`
 
 | Code | Meaning | Typical Cause | UI Handling |
 | --- | --- | --- | --- |
+| `invalid_kind` | search kind value invalid | kind not in `all/note/task/event` | keep input and prompt user to choose supported filter |
 | `db_error` | entry DB cannot be opened | invalid path, permissions, IO failure | show inline error, keep input |
 | `internal_error` | search execution failed | SQL/FTS query failure | show inline error, keep input |
 

@@ -6,7 +6,7 @@
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:lazynote_flutter/core/bindings/frb_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `atom_list_failure`, `atom_type_label`, `atom_update_status_impl`, `calendar_list_by_range_impl`, `calendar_update_event_impl`, `code`, `code`, `code`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `is_db_busy`, `map_db_error`, `map_note_service_error`, `map_repo_error`, `map_task_service_error`, `map_tree_repo_error`, `map_tree_service_error`, `map_workspace_db_error`, `message`, `message`, `message`, `normalize_entry_limit`, `normalize_section_limit`, `note_create_impl`, `note_failure`, `note_get_impl`, `note_set_tags_impl`, `note_update_impl`, `notes_list_impl`, `parse_folder_delete_mode`, `parse_note_id`, `parse_optional_parent_node_id`, `parse_workspace_atom_id`, `parse_workspace_node_id`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `tags_list_impl`, `tasks_list_inbox_impl`, `tasks_list_today_impl`, `tasks_list_upcoming_impl`, `to_atom_list_item`, `to_entry_search_item`, `to_note_item`, `to_workspace_node_item`, `with_atom_service`, `with_note_service`, `with_task_service`, `with_tree_service`, `workspace_create_folder_impl`, `workspace_create_note_ref_impl`, `workspace_delete_folder_impl`, `workspace_failure`, `workspace_list_children_impl`, `workspace_list_failure`, `workspace_move_node_impl`, `workspace_node_failure`, `workspace_node_kind_label`, `workspace_rename_node_impl`
+// These functions are ignored because they are not marked as `pub`: `atom_list_failure`, `atom_type_label`, `atom_update_status_impl`, `calendar_list_by_range_impl`, `calendar_update_event_impl`, `code`, `code`, `code`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `is_db_busy`, `map_db_error`, `map_note_service_error`, `map_repo_error`, `map_task_service_error`, `map_tree_repo_error`, `map_tree_service_error`, `map_workspace_db_error`, `message`, `message`, `message`, `normalize_entry_limit`, `normalize_section_limit`, `note_create_impl`, `note_failure`, `note_get_impl`, `note_set_tags_impl`, `note_update_impl`, `notes_list_impl`, `parse_entry_search_kind`, `parse_folder_delete_mode`, `parse_note_id`, `parse_optional_parent_node_id`, `parse_workspace_atom_id`, `parse_workspace_node_id`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `tags_list_impl`, `tasks_list_inbox_impl`, `tasks_list_today_impl`, `tasks_list_upcoming_impl`, `to_atom_list_item`, `to_entry_search_item`, `to_note_item`, `to_workspace_node_item`, `with_atom_service`, `with_note_service`, `with_task_service`, `with_tree_service`, `workspace_create_folder_impl`, `workspace_create_note_ref_impl`, `workspace_delete_folder_impl`, `workspace_failure`, `workspace_list_children_impl`, `workspace_list_failure`, `workspace_move_node_impl`, `workspace_node_failure`, `workspace_node_kind_label`, `workspace_rename_node_impl`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AtomFfiError`, `NotesFfiError`, `WorkspaceFfiError`
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
@@ -55,8 +55,15 @@ String configureEntryDbPath({required String dbPath}) =>
 /// - Async call, DB-backed execution.
 /// - Never panics.
 /// - Returns deterministic envelope with applied limit.
-Future<EntrySearchResponse> entrySearch({required String text, int? limit}) =>
-    RustLib.instance.api.crateApiEntrySearch(text: text, limit: limit);
+Future<EntrySearchResponse> entrySearch({
+  required String text,
+  String? kind,
+  int? limit,
+}) => RustLib.instance.api.crateApiEntrySearch(
+  text: text,
+  kind: kind,
+  limit: limit,
+);
 
 /// Creates a note from single-entry command flow.
 ///

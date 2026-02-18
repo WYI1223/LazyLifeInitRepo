@@ -13,7 +13,27 @@ typedef EntrySearchInvoker =
     Future<rust_api.EntrySearchResponse> Function({
       required String text,
       required int limit,
+      String? kind,
     });
+
+/// User-facing search kind filter for single-entry realtime search.
+enum EntrySearchKindFilter { all, note, task, event }
+
+extension EntrySearchKindFilterX on EntrySearchKindFilter {
+  String get label => switch (this) {
+    EntrySearchKindFilter.all => 'all',
+    EntrySearchKindFilter.note => 'note',
+    EntrySearchKindFilter.task => 'task',
+    EntrySearchKindFilter.event => 'event',
+  };
+
+  String? get ffiKind => switch (this) {
+    EntrySearchKindFilter.all => null,
+    EntrySearchKindFilter.note => 'note',
+    EntrySearchKindFilter.task => 'task',
+    EntrySearchKindFilter.event => 'event',
+  };
+}
 
 /// Async command executor for `> new note`.
 typedef EntryCreateNoteInvoker =
@@ -105,6 +125,7 @@ class SingleEntryController extends ChangeNotifier {
   bool _isDetailVisible = false;
   List<rust_api.EntrySearchItem> _searchItems = const [];
   int? _searchAppliedLimit;
+  EntrySearchKindFilter _searchKind = EntrySearchKindFilter.all;
   int _searchRequestSequence = 0;
   int _commandRequestSequence = 0;
   Timer? _searchDebounceTimer;
@@ -139,6 +160,9 @@ class SingleEntryController extends ChangeNotifier {
   /// Effective search limit returned by backend for latest search response.
   int? get searchAppliedLimit => _searchAppliedLimit;
 
+  /// Currently selected search filter kind.
+  EntrySearchKindFilter get searchKindFilter => _searchKind;
+
   /// Whether current intent is search-mode.
   bool get isSearchIntentActive => _state.intent is SearchIntent;
 
@@ -157,6 +181,25 @@ class SingleEntryController extends ChangeNotifier {
   /// Whether a command submission is currently in-flight.
   bool get isCommandSubmitting =>
       _state.intent is CommandIntent && _state.phase == EntryPhase.loading;
+
+  /// Updates search kind filter and re-runs realtime search for current input.
+  void setSearchKindFilter(EntrySearchKindFilter kind) {
+    if (_searchKind == kind) {
+      return;
+    }
+    _searchKind = kind;
+    _isDetailVisible = false;
+
+    final rawInput = _state.rawInput.isNotEmpty
+        ? _state.rawInput
+        : textController.text;
+    final intent = _router.route(rawInput);
+    if (intent is SearchIntent) {
+      _startRealtimeSearch(rawInput: rawInput, intent: intent);
+      return;
+    }
+    notifyListeners();
+  }
 
   /// Handles realtime routing for each input change.
   void handleInputChanged(String value) {
@@ -353,6 +396,7 @@ class SingleEntryController extends ChangeNotifier {
       final response = await _searchInvoker(
         text: intent.text,
         limit: intent.limit,
+        kind: _searchKind.ffiKind,
       );
       if (requestId != _searchRequestSequence) {
         return;
@@ -512,6 +556,7 @@ class SingleEntryController extends ChangeNotifier {
     final buffer = StringBuffer()
       ..writeln('mode=search')
       ..writeln('query="${intent.text}"')
+      ..writeln('filter_kind=${_searchKind.label}')
       ..writeln('limit=${intent.limit}')
       ..writeln('applied_limit=${response.appliedLimit}')
       ..writeln('items=${response.items.length}');
@@ -531,6 +576,7 @@ class SingleEntryController extends ChangeNotifier {
     return [
       'mode=search_item',
       'query="${intent.text}"',
+      'filter_kind=${_searchKind.label}',
       'limit=${intent.limit}',
       'kind=${item.kind}',
       'atom_id=${item.atomId}',
@@ -545,7 +591,7 @@ class SingleEntryController extends ChangeNotifier {
   String _detailForIntent(EntryIntent intent) {
     return switch (intent) {
       SearchIntent(:final text, :final limit) =>
-        'mode=search\nquery="$text"\nlimit=$limit',
+        'mode=search\nquery="$text"\nfilter_kind=${_searchKind.label}\nlimit=$limit',
       CommandIntent(:final command) => _detailForCommand(command),
       NoopIntent() => 'mode=idle',
       ParseErrorIntent(:final code, :final message) =>
@@ -577,9 +623,10 @@ class SingleEntryController extends ChangeNotifier {
 Future<rust_api.EntrySearchResponse> _defaultEntrySearch({
   required String text,
   required int limit,
+  String? kind,
 }) async {
   await RustBridge.init();
-  return rust_api.entrySearch(text: text, limit: limit);
+  return rust_api.entrySearch(text: text, kind: kind, limit: limit);
 }
 
 /// Default note command bridge call.

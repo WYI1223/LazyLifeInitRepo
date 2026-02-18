@@ -167,14 +167,33 @@ class SingleEntryPanel extends StatelessWidget {
                           ),
                           Expanded(
                             child: controller.isSearchIntentActive
-                                ? SearchResultsView(
-                                    visible: true,
-                                    isLoading: controller.isSearchLoading,
-                                    errorMessage: controller.searchErrorMessage,
-                                    items: controller.searchItems,
-                                    appliedLimit: controller.searchAppliedLimit,
-                                    onItemTap:
-                                        controller.openSearchResultDetail,
+                                ? Column(
+                                    children: [
+                                      _SearchKindFilterBar(
+                                        selected: controller.searchKindFilter,
+                                        onSelected:
+                                            controller.setSearchKindFilter,
+                                      ),
+                                      const Divider(
+                                        height: 1,
+                                        thickness: 0.6,
+                                        indent: 16,
+                                        endIndent: 16,
+                                      ),
+                                      Expanded(
+                                        child: SearchResultsView(
+                                          visible: true,
+                                          isLoading: controller.isSearchLoading,
+                                          errorMessage:
+                                              controller.searchErrorMessage,
+                                          items: controller.searchItems,
+                                          appliedLimit:
+                                              controller.searchAppliedLimit,
+                                          onItemTap:
+                                              controller.openSearchResultDetail,
+                                        ),
+                                      ),
+                                    ],
                                   )
                                 : _EntryResultPlaceholder(
                                     text: controller.hasInput
@@ -248,4 +267,35 @@ class _EntryResultPlaceholder extends StatelessWidget {
 class _DismissEntryIntent extends Intent {
   /// Local shortcut intent used by Esc to clear/close entry state.
   const _DismissEntryIntent();
+}
+
+class _SearchKindFilterBar extends StatelessWidget {
+  const _SearchKindFilterBar({
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final EntrySearchKindFilter selected;
+  final ValueChanged<EntrySearchKindFilter> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = EntrySearchKindFilter.values;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        children: [
+          for (final option in options)
+            ChoiceChip(
+              key: Key('single_entry_search_kind_${option.label}'),
+              label: Text(option.label.toUpperCase()),
+              selected: selected == option,
+              onSelected: (_) => onSelected(option),
+            ),
+        ],
+      ),
+    );
+  }
 }

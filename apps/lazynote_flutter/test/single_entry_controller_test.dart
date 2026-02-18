@@ -9,7 +9,7 @@ import 'package:lazynote_flutter/features/entry/single_entry_controller.dart';
 void main() {
   test('search success maps to success state with results detail', () async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         return EntrySearchResponse(
           ok: true,
           errorCode: null,
@@ -38,9 +38,39 @@ void main() {
     expect(controller.state.detailPayload, contains('atom-1'));
   });
 
+  test('search kind filter is forwarded to search invoker', () async {
+    final requestedKinds = <String?>[];
+    final controller = SingleEntryController(
+      searchInvoker: ({required text, required limit, String? kind}) async {
+        requestedKinds.add(kind);
+        return const EntrySearchResponse(
+          ok: true,
+          errorCode: null,
+          items: [],
+          message: 'No results.',
+          appliedLimit: 10,
+        );
+      },
+      searchDebounce: Duration.zero,
+    );
+    addTearDown(controller.dispose);
+
+    controller.handleInputChanged('filter me');
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+    expect(requestedKinds, [null]);
+
+    controller.setSearchKindFilter(EntrySearchKindFilter.task);
+    await Future<void>.delayed(Duration.zero);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(requestedKinds, [null, 'task']);
+    expect(controller.state.detailPayload, contains('filter_kind=task'));
+  });
+
   test('empty input clears to idle state', () async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         return const EntrySearchResponse(
           ok: true,
           errorCode: null,
@@ -65,7 +95,7 @@ void main() {
 
   test('search error response maps to error state with code', () async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         return const EntrySearchResponse(
           ok: false,
           errorCode: 'search_failed',
@@ -97,7 +127,7 @@ void main() {
       final second = Completer<EntrySearchResponse>();
 
       final controller = SingleEntryController(
-        searchInvoker: ({required text, required limit}) {
+        searchInvoker: ({required text, required limit, String? kind}) {
           if (text == 'first') {
             return first.future;
           }
@@ -330,7 +360,7 @@ void main() {
           commandCalls += 1;
           return commandResponse.future;
         },
-        searchInvoker: ({required text, required limit}) async {
+        searchInvoker: ({required text, required limit, String? kind}) async {
           searchCalls += 1;
           return const EntrySearchResponse(
             ok: true,
@@ -424,7 +454,7 @@ void main() {
         await prepareGate.future;
         prepareFinished = true;
       },
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         if (!prepareFinished) {
           searchCalledBeforePrepare = true;
         }
@@ -458,7 +488,7 @@ void main() {
 
     final controller = SingleEntryController(
       prepareSearch: () async => throw StateError('db config failed'),
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         searchCalls += 1;
         return const EntrySearchResponse(
           ok: true,

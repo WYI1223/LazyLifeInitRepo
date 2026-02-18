@@ -378,13 +378,14 @@ fn wire__crate__api__entry_search_impl(
             let mut deserializer =
                 flutter_rust_bridge::for_generated::SseDeserializer::new(message);
             let api_text = <String>::sse_decode(&mut deserializer);
+            let api_kind = <Option<String>>::sse_decode(&mut deserializer);
             let api_limit = <Option<u32>>::sse_decode(&mut deserializer);
             deserializer.end();
             move |context| async move {
                 transform_result_sse::<_, ()>(
                     (move || async move {
                         let output_ok = Result::<_, ()>::Ok(
-                            crate::api::entry_search(api_text, api_limit).await,
+                            crate::api::entry_search(api_text, api_kind, api_limit).await,
                         )?;
                         Ok(output_ok)
                     })()

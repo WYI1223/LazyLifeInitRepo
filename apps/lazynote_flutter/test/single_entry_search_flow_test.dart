@@ -17,15 +17,16 @@ void main() {
     WidgetTester tester,
   ) async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
+        final resolvedKind = kind ?? 'all';
         return EntrySearchResponse(
           ok: true,
           errorCode: null,
           items: [
             EntrySearchItem(
-              atomId: 'atom-$text',
-              kind: 'note',
-              snippet: 'snippet for $text',
+              atomId: 'atom-$resolvedKind',
+              kind: resolvedKind == 'all' ? 'note' : resolvedKind,
+              snippet: 'snippet for $text/$resolvedKind',
             ),
           ],
           message: 'Found 1 result(s).',
@@ -59,14 +60,19 @@ void main() {
       find.byKey(const Key('single_entry_search_results')),
       findsOneWidget,
     );
-    expect(find.textContaining('snippet for alpha'), findsOneWidget);
+    expect(find.textContaining('snippet for alpha/all'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('single_entry_search_kind_task')));
+    await pumpEntryRealtime(tester);
+
+    expect(find.textContaining('snippet for alpha/task'), findsOneWidget);
   });
 
   testWidgets('Enter opens detail without removing realtime results', (
     WidgetTester tester,
   ) async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         return EntrySearchResponse(
           ok: true,
           errorCode: null,
@@ -121,7 +127,7 @@ void main() {
     WidgetTester tester,
   ) async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         return const EntrySearchResponse(
           ok: true,
           errorCode: null,
@@ -174,7 +180,7 @@ void main() {
     WidgetTester tester,
   ) async {
     final controller = SingleEntryController(
-      searchInvoker: ({required text, required limit}) async {
+      searchInvoker: ({required text, required limit, String? kind}) async {
         return const EntrySearchResponse(
           ok: true,
           errorCode: null,

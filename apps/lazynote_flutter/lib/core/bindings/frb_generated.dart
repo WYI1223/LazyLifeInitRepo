@@ -114,6 +114,7 @@ abstract class RustLibApi extends BaseApi {
 
   Future<EntrySearchResponse> crateApiEntrySearch({
     required String text,
+    String? kind,
     int? limit,
   });
 
@@ -459,6 +460,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   @override
   Future<EntrySearchResponse> crateApiEntrySearch({
     required String text,
+    String? kind,
     int? limit,
   }) {
     return handler.executeNormal(
@@ -466,6 +468,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
         callFfi: (port_) {
           final serializer = SseSerializer(generalizedFrbRustBinding);
           sse_encode_String(text, serializer);
+          sse_encode_opt_String(kind, serializer);
           sse_encode_opt_box_autoadd_u_32(limit, serializer);
           pdeCallFfi(
             generalizedFrbRustBinding,
@@ -479,7 +482,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta: kCrateApiEntrySearchConstMeta,
-        argValues: [text, limit],
+        argValues: [text, kind, limit],
         apiImpl: this,
       ),
     );
@@ -487,7 +490,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   TaskConstMeta get kCrateApiEntrySearchConstMeta => const TaskConstMeta(
     debugName: 'entry_search',
-    argNames: ['text', 'limit'],
+    argNames: ['text', 'kind', 'limit'],
   );
 
   @override

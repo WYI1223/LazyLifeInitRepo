@@ -40,6 +40,8 @@ Language: English keywords only.
 
 - Default limit: 10
 - Max limit: 10
+- Supported filter kinds: `all` (default), `note`, `task`, `event`
+- Filter kind is passed to FFI `entry_search` via optional `kind` parameter.
 - Stale async responses must not overwrite newer input states.
 - Search failure is non-destructive: keep current input and show error.
 

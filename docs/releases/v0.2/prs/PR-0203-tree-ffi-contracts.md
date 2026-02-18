@@ -85,7 +85,7 @@ Rules:
 ## Current Decisions (locked)
 
 1. `PR-0203` first closes Workspace Tree FFI parity gap; UI feature expansion remains in `PR-0204/0205/0207`.
-2. `entry_search(kind)` is tracked as next follow-up after `PR-0203` M1 completion.
+2. `entry_search(kind)` follow-up has been landed after `PR-0203` completion.
 3. No streaming/watch API in v0.2; request/response only.
 4. `workspace_list_children` in v0.2 does not expose `limit/cursor`; pagination is follow-up scope.
 

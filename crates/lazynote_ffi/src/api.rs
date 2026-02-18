@@ -357,14 +357,36 @@ impl NotesFfiError {
 /// - Async call, DB-backed execution.
 /// - Never panics.
 /// - Returns deterministic envelope with applied limit.
+/// - `kind`: optional `all|note|task|event` (case-insensitive).
+/// - Returns `invalid_kind` when `kind` is outside allowed values.
 #[flutter_rust_bridge::frb]
-pub async fn entry_search(text: String, limit: Option<u32>) -> EntrySearchResponse {
-    entry_search_impl(text, limit)
+pub async fn entry_search(
+    text: String,
+    kind: Option<String>,
+    limit: Option<u32>,
+) -> EntrySearchResponse {
+    entry_search_impl(text, kind, limit)
 }
 
-fn entry_search_impl(text: String, limit: Option<u32>) -> EntrySearchResponse {
+fn entry_search_impl(
+    text: String,
+    kind: Option<String>,
+    limit: Option<u32>,
+) -> EntrySearchResponse {
     let normalized_limit = normalize_entry_limit(limit);
     let query_text = text.trim().to_string();
+    let parsed_kind = match parse_entry_search_kind(kind) {
+        Ok(parsed) => parsed,
+        Err(err) => {
+            return EntrySearchResponse {
+                ok: false,
+                error_code: Some("invalid_kind".to_string()),
+                items: Vec::new(),
+                message: err,
+                applied_limit: normalized_limit,
+            };
+        }
+    };
     let db_path = resolve_entry_db_path();
     let conn = match open_db(&db_path) {
         Ok(conn) => conn,
@@ -381,7 +403,7 @@ fn entry_search_impl(text: String, limit: Option<u32>) -> EntrySearchResponse {
 
     let query = SearchQuery {
         text: query_text,
-        kind: None,
+        kind: parsed_kind,
         limit: normalized_limit,
         raw_fts_syntax: false,
     };
@@ -412,6 +434,24 @@ fn entry_search_impl(text: String, limit: Option<u32>) -> EntrySearchResponse {
             message: format!("entry_search failed: {err}"),
             applied_limit: normalized_limit,
         },
+    }
+}
+
+fn parse_entry_search_kind(raw: Option<String>) -> Result<Option<AtomType>, String> {
+    let Some(value) = raw else {
+        return Ok(None);
+    };
+    let normalized = value.trim().to_ascii_lowercase();
+    if normalized.is_empty() || normalized == "all" {
+        return Ok(None);
+    }
+    match normalized.as_str() {
+        "note" => Ok(Some(AtomType::Note)),
+        "task" => Ok(Some(AtomType::Task)),
+        "event" => Ok(Some(AtomType::Event)),
+        _ => Err(format!(
+            "invalid kind `{value}`; expected one of all|note|task|event"
+        )),
     }
 }
 
@@ -1642,11 +1682,42 @@ mod tests {
             .clone()
             .expect("created note should return atom_id");
 
-        let response = entry_search_impl(token, Some(200));
+        let response = entry_search_impl(token, None, Some(200));
         assert_eq!(response.applied_limit, 50);
         assert!(response.ok, "{}", response.message);
         assert!(response.error_code.is_none());
         assert!(response.items.iter().any(|item| item.atom_id == created_id));
+    }
+
+    #[test]
+    fn entry_search_rejects_invalid_kind() {
+        let _guard = acquire_test_db_lock();
+        let response = entry_search_impl("hello".to_string(), Some("memo".to_string()), Some(7));
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("invalid_kind"));
+        assert_eq!(response.applied_limit, 7);
+    }
+
+    #[test]
+    fn entry_search_filters_results_by_kind() {
+        let _guard = acquire_test_db_lock();
+        let token = unique_token("entry-search-kind");
+
+        let note = entry_create_note_impl(format!("note {token}"));
+        assert!(note.ok, "{}", note.message);
+
+        let task = entry_create_task_impl(format!("task {token}"));
+        assert!(task.ok, "{}", task.message);
+
+        let note_response = entry_search_impl(token.clone(), Some("note".to_string()), Some(50));
+        assert!(note_response.ok, "{}", note_response.message);
+        assert!(!note_response.items.is_empty());
+        assert!(note_response.items.iter().all(|item| item.kind == "note"));
+
+        let task_response = entry_search_impl(token, Some("task".to_string()), Some(50));
+        assert!(task_response.ok, "{}", task_response.message);
+        assert!(!task_response.items.is_empty());
+        assert!(task_response.items.iter().all(|item| item.kind == "task"));
     }
 
     #[test]
