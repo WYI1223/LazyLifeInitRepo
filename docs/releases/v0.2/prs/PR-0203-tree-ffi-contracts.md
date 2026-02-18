@@ -95,6 +95,7 @@ Rules:
 - [edit] `apps/lazynote_flutter/lib/core/bindings/api.dart` (generated)
 - [edit] `apps/lazynote_flutter/lib/core/bindings/frb_generated.dart` (generated)
 - [edit] `apps/lazynote_flutter/lib/core/bindings/frb_generated.io.dart` (generated)
+- [add] `apps/lazynote_flutter/test/workspace_contract_smoke_test.dart`
 - [edit] `docs/api/ffi-contracts.md`
 - [add] `docs/api/workspace-tree-contract.md`
 - [edit] `docs/api/error-codes.md`

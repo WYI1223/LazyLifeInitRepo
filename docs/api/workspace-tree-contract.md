@@ -44,6 +44,9 @@ This document defines Flutter-callable workspace tree contracts exposed by
 5. `workspace_delete_folder` requires explicit mode:
 - `dissolve`
 - `delete_all`
+6. `workspace_move_node` normalizes `target_order` by clamping to visible sibling range:
+- `< 0` -> `0`
+- `> sibling_count` -> append at tail (`sibling_count`)
 
 ## Error Codes
 

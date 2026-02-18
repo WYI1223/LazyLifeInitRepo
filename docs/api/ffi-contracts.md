@@ -90,6 +90,9 @@ All APIs are use-case level and async.
 - `workspace_create_note_ref(parent_node_id?, atom_id, display_name?) -> WorkspaceNodeResponse`
 - `workspace_rename_node(node_id, new_name) -> WorkspaceActionResponse`
 - `workspace_move_node(node_id, new_parent_id?, target_order?) -> WorkspaceActionResponse`
+  - `target_order` is normalized by clamp in v0.2:
+    - `< 0` -> `0`
+    - `> sibling_count` -> append at tail
 - `workspace_delete_folder(node_id, mode) -> WorkspaceActionResponse`
   - `mode`: `dissolve` | `delete_all`
 

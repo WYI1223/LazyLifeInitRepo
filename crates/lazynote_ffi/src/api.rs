@@ -1967,6 +1967,26 @@ mod tests {
     }
 
     #[test]
+    fn workspace_create_folder_maps_parent_not_found_error_code() {
+        let _guard = acquire_test_db_lock();
+        let missing_parent = uuid::Uuid::new_v4().to_string();
+        let response =
+            workspace_create_folder_impl(Some(missing_parent), "child-folder".to_string());
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("parent_not_found"));
+    }
+
+    #[test]
+    fn workspace_create_folder_maps_parent_not_folder_error_code() {
+        let _guard = acquire_test_db_lock();
+        let parent_note_ref = create_workspace_note_ref_node();
+        let response =
+            workspace_create_folder_impl(Some(parent_note_ref), "child-folder".to_string());
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("parent_not_folder"));
+    }
+
+    #[test]
     fn workspace_list_children_returns_created_root_folder() {
         let _guard = acquire_test_db_lock();
         let name = unique_token("workspace-list-root");
@@ -1989,6 +2009,15 @@ mod tests {
         let response = workspace_create_note_ref_impl(None, "not-a-uuid".to_string(), None);
         assert!(!response.ok);
         assert_eq!(response.error_code.as_deref(), Some("invalid_atom_id"));
+    }
+
+    #[test]
+    fn workspace_create_note_ref_maps_atom_not_found_error_code() {
+        let _guard = acquire_test_db_lock();
+        let missing_atom = uuid::Uuid::new_v4().to_string();
+        let response = workspace_create_note_ref_impl(None, missing_atom, None);
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("atom_not_found"));
     }
 
     #[test]
