@@ -78,29 +78,59 @@ See full registry: `docs/api/error-codes.md`.
 
 ---
 
-## Workspace Tree APIs (PR-0221 M2)
+## Workspace Tree APIs (PR-0203 + PR-0221)
 
 All APIs are use-case level and async.
 
+### API Set
+
+- `workspace_list_children(parent_node_id?) -> WorkspaceListChildrenResponse`
+  - `parent_node_id = null` lists root-level nodes.
+- `workspace_create_folder(parent_node_id?, name) -> WorkspaceNodeResponse`
+- `workspace_create_note_ref(parent_node_id?, atom_id, display_name?) -> WorkspaceNodeResponse`
+- `workspace_rename_node(node_id, new_name) -> WorkspaceActionResponse`
+- `workspace_move_node(node_id, new_parent_id?, target_order?) -> WorkspaceActionResponse`
 - `workspace_delete_folder(node_id, mode) -> WorkspaceActionResponse`
-  - `node_id`: workspace folder node UUID
   - `mode`: `dissolve` | `delete_all`
-  - deterministic response envelope:
-    - `ok: bool`
-    - `error_code: String?`
-    - `message: String`
+
+### Workspace Node Payload
+
+`WorkspaceNodeItem`:
+
+- `node_id`
+- `kind` (`folder|note_ref`)
+- `parent_node_id`
+- `atom_id`
+- `display_name`
+- `sort_order`
+
+Envelope rules:
+
+- all workspace responses keep deterministic `ok/error_code/message`
+- `WorkspaceNodeResponse` carries optional `node`
+- `WorkspaceListChildrenResponse` carries `items`
 
 ### Error Code Mapping (Workspace Tree)
 
 Producer: `crates/lazynote_ffi/src/api.rs`
 
 - `invalid_node_id`
+- `invalid_parent_node_id`
+- `invalid_atom_id`
+- `invalid_display_name`
 - `invalid_delete_mode`
 - `node_not_found`
+- `parent_not_found`
 - `node_not_folder`
+- `parent_not_folder`
+- `atom_not_found`
+- `atom_not_note`
+- `cycle_detected`
 - `db_busy`
 - `db_error`
 - `internal_error`
+
+Detailed contract: `docs/api/workspace-tree-contract.md`.
 
 ### Controller-Local Error Codes (Workspace Tree UI)
 

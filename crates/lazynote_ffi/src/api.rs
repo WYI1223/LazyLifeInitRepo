@@ -17,7 +17,7 @@ use lazynote_core::{
     search_all, AtomId, AtomService, AtomType, FolderDeleteMode, NoteRecord, NoteService,
     NoteServiceError, ScheduleEventRequest, SearchQuery, SectionAtom, SqliteAtomRepository,
     SqliteNoteRepository, SqliteTreeRepository, TaskService, TaskServiceError, TreeRepoError,
-    TreeService, TreeServiceError,
+    TreeService, TreeServiceError, WorkspaceNode, WorkspaceNodeKind,
 };
 use log::error;
 use std::path::PathBuf;
@@ -208,12 +208,63 @@ pub struct WorkspaceActionResponse {
     pub message: String,
 }
 
+/// Workspace tree node DTO exposed over FFI.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceNodeItem {
+    /// Stable workspace node id.
+    pub node_id: String,
+    /// Node kind label (`folder|note_ref`).
+    pub kind: String,
+    /// Parent node id for non-root nodes.
+    pub parent_node_id: Option<String>,
+    /// Target note atom id for note_ref nodes.
+    pub atom_id: Option<String>,
+    /// User-facing display name.
+    pub display_name: String,
+    /// Deterministic sibling order key.
+    pub sort_order: i64,
+}
+
+/// Workspace single-node response envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceNodeResponse {
+    /// Whether operation succeeded.
+    pub ok: bool,
+    /// Stable machine-readable error code for failure paths.
+    pub error_code: Option<String>,
+    /// Human-readable message for diagnostics/UI.
+    pub message: String,
+    /// Returned node payload on success.
+    pub node: Option<WorkspaceNodeItem>,
+}
+
+/// Workspace children-list response envelope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceListChildrenResponse {
+    /// Whether operation succeeded.
+    pub ok: bool,
+    /// Stable machine-readable error code for failure paths.
+    pub error_code: Option<String>,
+    /// Human-readable message for diagnostics/UI.
+    pub message: String,
+    /// Child nodes in deterministic order.
+    pub items: Vec<WorkspaceNodeItem>,
+}
+
 #[derive(Debug)]
 enum WorkspaceFfiError {
     InvalidNodeId(String),
+    InvalidParentNodeId(String),
+    InvalidAtomId(String),
+    InvalidDisplayName(String),
     InvalidDeleteMode(String),
     NodeNotFound(String),
+    ParentNotFound(String),
     NodeNotFolder(String),
+    ParentNotFolder(String),
+    AtomNotFound(String),
+    AtomNotNote(String),
+    CycleDetected(String),
     DbBusy(String),
     DbError(String),
     Internal(String),
@@ -223,9 +274,17 @@ impl WorkspaceFfiError {
     fn code(&self) -> &'static str {
         match self {
             Self::InvalidNodeId(_) => "invalid_node_id",
+            Self::InvalidParentNodeId(_) => "invalid_parent_node_id",
+            Self::InvalidAtomId(_) => "invalid_atom_id",
+            Self::InvalidDisplayName(_) => "invalid_display_name",
             Self::InvalidDeleteMode(_) => "invalid_delete_mode",
             Self::NodeNotFound(_) => "node_not_found",
+            Self::ParentNotFound(_) => "parent_not_found",
             Self::NodeNotFolder(_) => "node_not_folder",
+            Self::ParentNotFolder(_) => "parent_not_folder",
+            Self::AtomNotFound(_) => "atom_not_found",
+            Self::AtomNotNote(_) => "atom_not_note",
+            Self::CycleDetected(_) => "cycle_detected",
             Self::DbBusy(_) => "db_busy",
             Self::DbError(_) => "db_error",
             Self::Internal(_) => "internal_error",
@@ -235,11 +294,19 @@ impl WorkspaceFfiError {
     fn message(&self) -> String {
         match self {
             Self::InvalidNodeId(value) => format!("invalid node id: {value}"),
+            Self::InvalidParentNodeId(value) => format!("invalid parent node id: {value}"),
+            Self::InvalidAtomId(value) => format!("invalid atom id: {value}"),
+            Self::InvalidDisplayName(value) => format!("invalid display name: {value}"),
             Self::InvalidDeleteMode(value) => {
                 format!("invalid delete mode: {value}, expected dissolve|delete_all")
             }
             Self::NodeNotFound(value) => format!("workspace node not found: {value}"),
+            Self::ParentNotFound(value) => format!("workspace parent not found: {value}"),
             Self::NodeNotFolder(value) => format!("workspace node is not a folder: {value}"),
+            Self::ParentNotFolder(value) => format!("workspace parent is not a folder: {value}"),
+            Self::AtomNotFound(value) => format!("workspace atom not found: {value}"),
+            Self::AtomNotNote(value) => format!("workspace atom is not a note: {value}"),
+            Self::CycleDetected(value) => format!("workspace cycle detected: {value}"),
             Self::DbBusy(value) => format!("workspace database busy: {value}"),
             Self::DbError(value) => format!("workspace database error: {value}"),
             Self::Internal(value) => format!("workspace internal error: {value}"),
@@ -599,6 +666,172 @@ fn tags_list_impl() -> TagsListResponse {
     }
 }
 
+/// Lists workspace child nodes under optional parent.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `parent_node_id` is optional UUID string; `None` lists root-level nodes.
+#[flutter_rust_bridge::frb]
+pub async fn workspace_list_children(
+    parent_node_id: Option<String>,
+) -> WorkspaceListChildrenResponse {
+    workspace_list_children_impl(parent_node_id)
+}
+
+fn workspace_list_children_impl(parent_node_id: Option<String>) -> WorkspaceListChildrenResponse {
+    let parsed_parent = match parse_optional_parent_node_id(parent_node_id) {
+        Ok(value) => value,
+        Err(err) => return workspace_list_failure(err),
+    };
+
+    match with_tree_service(|service| service.list_children(parsed_parent)) {
+        Ok(nodes) => WorkspaceListChildrenResponse {
+            ok: true,
+            error_code: None,
+            message: format!("Loaded {} workspace node(s).", nodes.len()),
+            items: nodes.into_iter().map(to_workspace_node_item).collect(),
+        },
+        Err(err) => workspace_list_failure(err),
+    }
+}
+
+/// Creates one workspace folder under optional parent.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `parent_node_id` is optional UUID string; `None` creates root-level folder.
+#[flutter_rust_bridge::frb]
+pub async fn workspace_create_folder(
+    parent_node_id: Option<String>,
+    name: String,
+) -> WorkspaceNodeResponse {
+    workspace_create_folder_impl(parent_node_id, name)
+}
+
+fn workspace_create_folder_impl(
+    parent_node_id: Option<String>,
+    name: String,
+) -> WorkspaceNodeResponse {
+    let parsed_parent = match parse_optional_parent_node_id(parent_node_id) {
+        Ok(value) => value,
+        Err(err) => return workspace_node_failure(err),
+    };
+
+    match with_tree_service(|service| service.create_folder(parsed_parent, name)) {
+        Ok(node) => WorkspaceNodeResponse {
+            ok: true,
+            error_code: None,
+            message: "Workspace folder created.".to_string(),
+            node: Some(to_workspace_node_item(node)),
+        },
+        Err(err) => workspace_node_failure(err),
+    }
+}
+
+/// Creates one workspace note_ref under optional parent.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `atom_id` must be UUID string of a note atom.
+#[flutter_rust_bridge::frb]
+pub async fn workspace_create_note_ref(
+    parent_node_id: Option<String>,
+    atom_id: String,
+    display_name: Option<String>,
+) -> WorkspaceNodeResponse {
+    workspace_create_note_ref_impl(parent_node_id, atom_id, display_name)
+}
+
+fn workspace_create_note_ref_impl(
+    parent_node_id: Option<String>,
+    atom_id: String,
+    display_name: Option<String>,
+) -> WorkspaceNodeResponse {
+    let parsed_parent = match parse_optional_parent_node_id(parent_node_id) {
+        Ok(value) => value,
+        Err(err) => return workspace_node_failure(err),
+    };
+    let parsed_atom_id = match parse_workspace_atom_id(atom_id.as_str()) {
+        Ok(value) => value,
+        Err(err) => return workspace_node_failure(err),
+    };
+
+    match with_tree_service(|service| {
+        service.create_note_ref(parsed_parent, parsed_atom_id, display_name)
+    }) {
+        Ok(node) => WorkspaceNodeResponse {
+            ok: true,
+            error_code: None,
+            message: "Workspace note reference created.".to_string(),
+            node: Some(to_workspace_node_item(node)),
+        },
+        Err(err) => workspace_node_failure(err),
+    }
+}
+
+/// Renames one workspace node.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `node_id` must be UUID string.
+#[flutter_rust_bridge::frb]
+pub async fn workspace_rename_node(node_id: String, new_name: String) -> WorkspaceActionResponse {
+    workspace_rename_node_impl(node_id, new_name)
+}
+
+fn workspace_rename_node_impl(node_id: String, new_name: String) -> WorkspaceActionResponse {
+    let parsed_id = match parse_workspace_node_id(node_id.as_str()) {
+        Ok(value) => value,
+        Err(err) => return workspace_failure(err),
+    };
+    match with_tree_service(|service| service.rename_node(parsed_id, new_name)) {
+        Ok(()) => WorkspaceActionResponse {
+            ok: true,
+            error_code: None,
+            message: "Workspace node renamed.".to_string(),
+        },
+        Err(err) => workspace_failure(err),
+    }
+}
+
+/// Moves one workspace node under optional new parent and target order.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `new_parent_id = None` moves node to root level.
+#[flutter_rust_bridge::frb]
+pub async fn workspace_move_node(
+    node_id: String,
+    new_parent_id: Option<String>,
+    target_order: Option<i64>,
+) -> WorkspaceActionResponse {
+    workspace_move_node_impl(node_id, new_parent_id, target_order)
+}
+
+fn workspace_move_node_impl(
+    node_id: String,
+    new_parent_id: Option<String>,
+    target_order: Option<i64>,
+) -> WorkspaceActionResponse {
+    let parsed_id = match parse_workspace_node_id(node_id.as_str()) {
+        Ok(value) => value,
+        Err(err) => return workspace_failure(err),
+    };
+    let parsed_parent = match parse_optional_parent_node_id(new_parent_id) {
+        Ok(value) => value,
+        Err(err) => return workspace_failure(err),
+    };
+
+    match with_tree_service(|service| service.move_node(parsed_id, parsed_parent, target_order)) {
+        Ok(()) => WorkspaceActionResponse {
+            ok: true,
+            error_code: None,
+            message: "Workspace node moved.".to_string(),
+        },
+        Err(err) => workspace_failure(err),
+    }
+}
+
 /// Deletes one workspace folder by explicit mode (`dissolve|delete_all`).
 ///
 /// # FFI contract
@@ -611,9 +844,9 @@ pub async fn workspace_delete_folder(node_id: String, mode: String) -> Workspace
 }
 
 fn workspace_delete_folder_impl(node_id: String, mode: String) -> WorkspaceActionResponse {
-    let parsed_id = match Uuid::parse_str(node_id.trim()) {
+    let parsed_id = match parse_workspace_node_id(node_id.as_str()) {
         Ok(value) => value,
-        Err(_) => return workspace_failure(WorkspaceFfiError::InvalidNodeId(node_id)),
+        Err(err) => return workspace_failure(err),
     };
 
     let parsed_mode = match parse_folder_delete_mode(mode.as_str()) {
@@ -728,6 +961,29 @@ fn parse_folder_delete_mode(raw: &str) -> Result<FolderDeleteMode, WorkspaceFfiE
     }
 }
 
+fn parse_workspace_node_id(raw: &str) -> Result<Uuid, WorkspaceFfiError> {
+    Uuid::parse_str(raw.trim()).map_err(|_| WorkspaceFfiError::InvalidNodeId(raw.to_string()))
+}
+
+fn parse_optional_parent_node_id(raw: Option<String>) -> Result<Option<Uuid>, WorkspaceFfiError> {
+    match raw {
+        None => Ok(None),
+        Some(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                return Err(WorkspaceFfiError::InvalidParentNodeId(value));
+            }
+            Uuid::parse_str(trimmed)
+                .map(Some)
+                .map_err(|_| WorkspaceFfiError::InvalidParentNodeId(value))
+        }
+    }
+}
+
+fn parse_workspace_atom_id(raw: &str) -> Result<AtomId, WorkspaceFfiError> {
+    Uuid::parse_str(raw.trim()).map_err(|_| WorkspaceFfiError::InvalidAtomId(raw.to_string()))
+}
+
 fn parse_note_id(raw: &str) -> Result<AtomId, NotesFfiError> {
     Uuid::parse_str(raw.trim()).map_err(|_| NotesFfiError::InvalidNoteId(raw.to_string()))
 }
@@ -740,6 +996,24 @@ fn to_note_item(value: NoteRecord) -> NoteItem {
         preview_image: value.preview_image,
         updated_at: value.updated_at,
         tags: value.tags,
+    }
+}
+
+fn workspace_node_kind_label(kind: WorkspaceNodeKind) -> &'static str {
+    match kind {
+        WorkspaceNodeKind::Folder => "folder",
+        WorkspaceNodeKind::NoteRef => "note_ref",
+    }
+}
+
+fn to_workspace_node_item(node: WorkspaceNode) -> WorkspaceNodeItem {
+    WorkspaceNodeItem {
+        node_id: node.node_uuid.to_string(),
+        kind: workspace_node_kind_label(node.kind).to_string(),
+        parent_node_id: node.parent_uuid.map(|value| value.to_string()),
+        atom_id: node.atom_uuid.map(|value| value.to_string()),
+        display_name: node.display_name,
+        sort_order: node.sort_order,
     }
 }
 
@@ -757,6 +1031,24 @@ fn workspace_failure(error: WorkspaceFfiError) -> WorkspaceActionResponse {
         ok: false,
         error_code: Some(error.code().to_string()),
         message: error.message(),
+    }
+}
+
+fn workspace_node_failure(error: WorkspaceFfiError) -> WorkspaceNodeResponse {
+    WorkspaceNodeResponse {
+        ok: false,
+        error_code: Some(error.code().to_string()),
+        message: error.message(),
+        node: None,
+    }
+}
+
+fn workspace_list_failure(error: WorkspaceFfiError) -> WorkspaceListChildrenResponse {
+    WorkspaceListChildrenResponse {
+        ok: false,
+        error_code: Some(error.code().to_string()),
+        message: error.message(),
+        items: Vec::new(),
     }
 }
 
@@ -841,33 +1133,31 @@ fn map_tree_repo_error(err: TreeRepoError) -> WorkspaceFfiError {
 
 fn map_tree_service_error(err: TreeServiceError) -> WorkspaceFfiError {
     match err {
-        TreeServiceError::InvalidDisplayName => WorkspaceFfiError::Internal(
-            "invalid display name for workspace folder delete operation".to_string(),
-        ),
+        TreeServiceError::InvalidDisplayName => {
+            WorkspaceFfiError::InvalidDisplayName("display name must not be blank".to_string())
+        }
         TreeServiceError::NodeNotFound(node_id) => {
             WorkspaceFfiError::NodeNotFound(node_id.to_string())
         }
         TreeServiceError::ParentNotFound(node_id) => {
-            WorkspaceFfiError::NodeNotFound(node_id.to_string())
+            WorkspaceFfiError::ParentNotFound(node_id.to_string())
         }
         TreeServiceError::ParentMustBeFolder(node_id) => {
-            WorkspaceFfiError::NodeNotFolder(node_id.to_string())
+            WorkspaceFfiError::ParentNotFolder(node_id.to_string())
         }
         TreeServiceError::NodeMustBeFolder(node_id) => {
             WorkspaceFfiError::NodeNotFolder(node_id.to_string())
         }
         TreeServiceError::AtomNotFound(atom_id) => {
-            WorkspaceFfiError::Internal(format!("atom not found while deleting folder: {atom_id}"))
+            WorkspaceFfiError::AtomNotFound(atom_id.to_string())
         }
-        TreeServiceError::AtomNotNote(atom_id) => WorkspaceFfiError::Internal(format!(
-            "atom is not note while deleting folder: {atom_id}"
-        )),
+        TreeServiceError::AtomNotNote(atom_id) => {
+            WorkspaceFfiError::AtomNotNote(atom_id.to_string())
+        }
         TreeServiceError::CycleDetected {
             node_uuid,
             parent_uuid,
-        } => WorkspaceFfiError::Internal(format!(
-            "cycle detected while deleting folder node={node_uuid} parent={parent_uuid}"
-        )),
+        } => WorkspaceFfiError::CycleDetected(format!("node={node_uuid} parent={parent_uuid}")),
         TreeServiceError::Repo(repo_err) => map_tree_repo_error(repo_err),
     }
 }
@@ -1284,7 +1574,9 @@ mod tests {
         core_version, entry_create_note_impl, entry_create_task_impl, entry_schedule_impl,
         entry_search_impl, init_logging, map_db_error, map_repo_error, map_workspace_db_error,
         note_create_impl, note_get_impl, note_set_tags_impl, note_update_impl, notes_list_impl,
-        ping, tags_list_impl, workspace_delete_folder_impl, NotesFfiError, WorkspaceFfiError,
+        ping, tags_list_impl, workspace_create_folder_impl, workspace_create_note_ref_impl,
+        workspace_delete_folder_impl, workspace_list_children_impl, workspace_move_node_impl,
+        workspace_rename_node_impl, NotesFfiError, WorkspaceFfiError,
     };
     use lazynote_core::db::open_db;
     use lazynote_core::{SqliteTreeRepository, TreeService};
@@ -1634,6 +1926,107 @@ mod tests {
             .expect("create workspace note_ref")
             .node_uuid
             .to_string()
+    }
+
+    fn create_workspace_folder_via_ffi(name: &str) -> String {
+        let response = workspace_create_folder_impl(None, name.to_string());
+        assert!(response.ok, "{}", response.message);
+        response
+            .node
+            .expect("workspace node payload")
+            .node_id
+            .to_string()
+    }
+
+    #[test]
+    fn workspace_create_folder_returns_node_payload() {
+        let _guard = acquire_test_db_lock();
+        let name = unique_token("workspace-folder");
+        let response = workspace_create_folder_impl(None, name.clone());
+        assert!(response.ok, "{}", response.message);
+        let node = response.node.expect("workspace node payload");
+        assert_eq!(node.kind, "folder");
+        assert_eq!(node.display_name, name);
+        assert!(uuid::Uuid::parse_str(node.node_id.as_str()).is_ok());
+        assert!(node.parent_node_id.is_none());
+        assert!(node.atom_id.is_none());
+    }
+
+    #[test]
+    fn workspace_create_folder_rejects_invalid_parent_node_id() {
+        let _guard = acquire_test_db_lock();
+        let response = workspace_create_folder_impl(
+            Some("not-a-uuid".to_string()),
+            "invalid parent".to_string(),
+        );
+        assert!(!response.ok);
+        assert_eq!(
+            response.error_code.as_deref(),
+            Some("invalid_parent_node_id")
+        );
+    }
+
+    #[test]
+    fn workspace_list_children_returns_created_root_folder() {
+        let _guard = acquire_test_db_lock();
+        let name = unique_token("workspace-list-root");
+        let created_id = create_workspace_folder_via_ffi(name.as_str());
+
+        let response = workspace_list_children_impl(None);
+        assert!(response.ok, "{}", response.message);
+        assert!(
+            response
+                .items
+                .iter()
+                .any(|item| item.node_id == created_id && item.display_name == name),
+            "created root folder should appear in list_children(None)"
+        );
+    }
+
+    #[test]
+    fn workspace_create_note_ref_rejects_invalid_atom_id() {
+        let _guard = acquire_test_db_lock();
+        let response = workspace_create_note_ref_impl(None, "not-a-uuid".to_string(), None);
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("invalid_atom_id"));
+    }
+
+    #[test]
+    fn workspace_create_note_ref_rejects_non_note_atom() {
+        let _guard = acquire_test_db_lock();
+        let created = entry_create_task_impl("workspace task".to_string());
+        assert!(created.ok, "{}", created.message);
+        let atom_id = created.atom_id.expect("task atom id");
+        let response = workspace_create_note_ref_impl(None, atom_id, None);
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("atom_not_note"));
+    }
+
+    #[test]
+    fn workspace_rename_node_rejects_blank_name() {
+        let _guard = acquire_test_db_lock();
+        let node_id = create_workspace_folder_via_ffi("rename-target");
+        let response = workspace_rename_node_impl(node_id, "   ".to_string());
+        assert!(!response.ok);
+        assert_eq!(response.error_code.as_deref(), Some("invalid_display_name"));
+    }
+
+    #[test]
+    fn workspace_move_node_rejects_cycle() {
+        let _guard = acquire_test_db_lock();
+        let parent_id = create_workspace_folder_via_ffi("move-parent");
+        let child_response =
+            workspace_create_folder_impl(Some(parent_id.clone()), "move-child".to_string());
+        assert!(child_response.ok, "{}", child_response.message);
+        let child_id = child_response
+            .node
+            .expect("child node payload")
+            .node_id
+            .to_string();
+
+        let move_response = workspace_move_node_impl(parent_id, Some(child_id), None);
+        assert!(!move_response.ok);
+        assert_eq!(move_response.error_code.as_deref(), Some("cycle_detected"));
     }
 
     #[test]

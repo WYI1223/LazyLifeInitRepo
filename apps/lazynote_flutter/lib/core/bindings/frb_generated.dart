@@ -65,7 +65,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => 1076414138;
+  int get rustContentHash => 1852740980;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -158,9 +158,35 @@ abstract class RustLibApi extends BaseApi {
     int? offset,
   });
 
+  Future<WorkspaceNodeResponse> crateApiWorkspaceCreateFolder({
+    String? parentNodeId,
+    required String name,
+  });
+
+  Future<WorkspaceNodeResponse> crateApiWorkspaceCreateNoteRef({
+    String? parentNodeId,
+    required String atomId,
+    String? displayName,
+  });
+
   Future<WorkspaceActionResponse> crateApiWorkspaceDeleteFolder({
     required String nodeId,
     required String mode,
+  });
+
+  Future<WorkspaceListChildrenResponse> crateApiWorkspaceListChildren({
+    String? parentNodeId,
+  });
+
+  Future<WorkspaceActionResponse> crateApiWorkspaceMoveNode({
+    required String nodeId,
+    String? newParentId,
+    PlatformInt64? targetOrder,
+  });
+
+  Future<WorkspaceActionResponse> crateApiWorkspaceRenameNode({
+    required String nodeId,
+    required String newName,
   });
 }
 
@@ -805,6 +831,78 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   );
 
   @override
+  Future<WorkspaceNodeResponse> crateApiWorkspaceCreateFolder({
+    String? parentNodeId,
+    required String name,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(parentNodeId, serializer);
+          sse_encode_String(name, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 21,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_node_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWorkspaceCreateFolderConstMeta,
+        argValues: [parentNodeId, name],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWorkspaceCreateFolderConstMeta =>
+      const TaskConstMeta(
+        debugName: 'workspace_create_folder',
+        argNames: ['parentNodeId', 'name'],
+      );
+
+  @override
+  Future<WorkspaceNodeResponse> crateApiWorkspaceCreateNoteRef({
+    String? parentNodeId,
+    required String atomId,
+    String? displayName,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(parentNodeId, serializer);
+          sse_encode_String(atomId, serializer);
+          sse_encode_opt_String(displayName, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 22,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_node_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWorkspaceCreateNoteRefConstMeta,
+        argValues: [parentNodeId, atomId, displayName],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWorkspaceCreateNoteRefConstMeta =>
+      const TaskConstMeta(
+        debugName: 'workspace_create_note_ref',
+        argNames: ['parentNodeId', 'atomId', 'displayName'],
+      );
+
+  @override
   Future<WorkspaceActionResponse> crateApiWorkspaceDeleteFolder({
     required String nodeId,
     required String mode,
@@ -818,7 +916,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 21,
+            funcId: 23,
             port: port_,
           );
         },
@@ -837,6 +935,110 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       const TaskConstMeta(
         debugName: 'workspace_delete_folder',
         argNames: ['nodeId', 'mode'],
+      );
+
+  @override
+  Future<WorkspaceListChildrenResponse> crateApiWorkspaceListChildren({
+    String? parentNodeId,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_opt_String(parentNodeId, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 24,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_list_children_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWorkspaceListChildrenConstMeta,
+        argValues: [parentNodeId],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWorkspaceListChildrenConstMeta =>
+      const TaskConstMeta(
+        debugName: 'workspace_list_children',
+        argNames: ['parentNodeId'],
+      );
+
+  @override
+  Future<WorkspaceActionResponse> crateApiWorkspaceMoveNode({
+    required String nodeId,
+    String? newParentId,
+    PlatformInt64? targetOrder,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(nodeId, serializer);
+          sse_encode_opt_String(newParentId, serializer);
+          sse_encode_opt_box_autoadd_i_64(targetOrder, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 25,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_action_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWorkspaceMoveNodeConstMeta,
+        argValues: [nodeId, newParentId, targetOrder],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWorkspaceMoveNodeConstMeta => const TaskConstMeta(
+    debugName: 'workspace_move_node',
+    argNames: ['nodeId', 'newParentId', 'targetOrder'],
+  );
+
+  @override
+  Future<WorkspaceActionResponse> crateApiWorkspaceRenameNode({
+    required String nodeId,
+    required String newName,
+  }) {
+    return handler.executeNormal(
+      NormalTask(
+        callFfi: (port_) {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_String(nodeId, serializer);
+          sse_encode_String(newName, serializer);
+          pdeCallFfi(
+            generalizedFrbRustBinding,
+            serializer,
+            funcId: 26,
+            port: port_,
+          );
+        },
+        codec: SseCodec(
+          decodeSuccessData: sse_decode_workspace_action_response,
+          decodeErrorData: null,
+        ),
+        constMeta: kCrateApiWorkspaceRenameNodeConstMeta,
+        argValues: [nodeId, newName],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiWorkspaceRenameNodeConstMeta =>
+      const TaskConstMeta(
+        debugName: 'workspace_rename_node',
+        argNames: ['nodeId', 'newName'],
       );
 
   @protected
@@ -902,6 +1104,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int dco_decode_box_autoadd_u_32(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return raw as int;
+  }
+
+  @protected
+  WorkspaceNodeItem dco_decode_box_autoadd_workspace_node_item(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return dco_decode_workspace_node_item(raw);
   }
 
   @protected
@@ -982,6 +1190,12 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<WorkspaceNodeItem> dco_decode_list_workspace_node_item(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return (raw as List<dynamic>).map(dco_decode_workspace_node_item).toList();
+  }
+
+  @protected
   NoteItem dco_decode_note_item(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1051,6 +1265,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WorkspaceNodeItem? dco_decode_opt_box_autoadd_workspace_node_item(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return raw == null ? null : dco_decode_box_autoadd_workspace_node_item(raw);
+  }
+
+  @protected
   TagsListResponse dco_decode_tags_list_response(dynamic raw) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     final arr = raw as List<dynamic>;
@@ -1092,6 +1314,52 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ok: dco_decode_bool(arr[0]),
       errorCode: dco_decode_opt_String(arr[1]),
       message: dco_decode_String(arr[2]),
+    );
+  }
+
+  @protected
+  WorkspaceListChildrenResponse dco_decode_workspace_list_children_response(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return WorkspaceListChildrenResponse(
+      ok: dco_decode_bool(arr[0]),
+      errorCode: dco_decode_opt_String(arr[1]),
+      message: dco_decode_String(arr[2]),
+      items: dco_decode_list_workspace_node_item(arr[3]),
+    );
+  }
+
+  @protected
+  WorkspaceNodeItem dco_decode_workspace_node_item(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 6)
+      throw Exception('unexpected arr length: expect 6 but see ${arr.length}');
+    return WorkspaceNodeItem(
+      nodeId: dco_decode_String(arr[0]),
+      kind: dco_decode_String(arr[1]),
+      parentNodeId: dco_decode_opt_String(arr[2]),
+      atomId: dco_decode_opt_String(arr[3]),
+      displayName: dco_decode_String(arr[4]),
+      sortOrder: dco_decode_i_64(arr[5]),
+    );
+  }
+
+  @protected
+  WorkspaceNodeResponse dco_decode_workspace_node_response(dynamic raw) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    final arr = raw as List<dynamic>;
+    if (arr.length != 4)
+      throw Exception('unexpected arr length: expect 4 but see ${arr.length}');
+    return WorkspaceNodeResponse(
+      ok: dco_decode_bool(arr[0]),
+      errorCode: dco_decode_opt_String(arr[1]),
+      message: dco_decode_String(arr[2]),
+      node: dco_decode_opt_box_autoadd_workspace_node_item(arr[3]),
     );
   }
 
@@ -1168,6 +1436,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return (sse_decode_u_32(deserializer));
+  }
+
+  @protected
+  WorkspaceNodeItem sse_decode_box_autoadd_workspace_node_item(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return (sse_decode_workspace_node_item(deserializer));
   }
 
   @protected
@@ -1283,6 +1559,20 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  List<WorkspaceNodeItem> sse_decode_list_workspace_node_item(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    var len_ = sse_decode_i_32(deserializer);
+    var ans_ = <WorkspaceNodeItem>[];
+    for (var idx_ = 0; idx_ < len_; ++idx_) {
+      ans_.add(sse_decode_workspace_node_item(deserializer));
+    }
+    return ans_;
+  }
+
+  @protected
   NoteItem sse_decode_note_item(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_atomId = sse_decode_String(deserializer);
@@ -1380,6 +1670,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  WorkspaceNodeItem? sse_decode_opt_box_autoadd_workspace_node_item(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    if (sse_decode_bool(deserializer)) {
+      return (sse_decode_box_autoadd_workspace_node_item(deserializer));
+    } else {
+      return null;
+    }
+  }
+
+  @protected
   TagsListResponse sse_decode_tags_list_response(SseDeserializer deserializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     var var_ok = sse_decode_bool(deserializer);
@@ -1423,6 +1726,61 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
       ok: var_ok,
       errorCode: var_errorCode,
       message: var_message,
+    );
+  }
+
+  @protected
+  WorkspaceListChildrenResponse sse_decode_workspace_list_children_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_errorCode = sse_decode_opt_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_items = sse_decode_list_workspace_node_item(deserializer);
+    return WorkspaceListChildrenResponse(
+      ok: var_ok,
+      errorCode: var_errorCode,
+      message: var_message,
+      items: var_items,
+    );
+  }
+
+  @protected
+  WorkspaceNodeItem sse_decode_workspace_node_item(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_nodeId = sse_decode_String(deserializer);
+    var var_kind = sse_decode_String(deserializer);
+    var var_parentNodeId = sse_decode_opt_String(deserializer);
+    var var_atomId = sse_decode_opt_String(deserializer);
+    var var_displayName = sse_decode_String(deserializer);
+    var var_sortOrder = sse_decode_i_64(deserializer);
+    return WorkspaceNodeItem(
+      nodeId: var_nodeId,
+      kind: var_kind,
+      parentNodeId: var_parentNodeId,
+      atomId: var_atomId,
+      displayName: var_displayName,
+      sortOrder: var_sortOrder,
+    );
+  }
+
+  @protected
+  WorkspaceNodeResponse sse_decode_workspace_node_response(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    var var_ok = sse_decode_bool(deserializer);
+    var var_errorCode = sse_decode_opt_String(deserializer);
+    var var_message = sse_decode_String(deserializer);
+    var var_node = sse_decode_opt_box_autoadd_workspace_node_item(deserializer);
+    return WorkspaceNodeResponse(
+      ok: var_ok,
+      errorCode: var_errorCode,
+      message: var_message,
+      node: var_node,
     );
   }
 
@@ -1494,6 +1852,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_u_32(self, serializer);
+  }
+
+  @protected
+  void sse_encode_box_autoadd_workspace_node_item(
+    WorkspaceNodeItem self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_workspace_node_item(self, serializer);
   }
 
   @protected
@@ -1593,6 +1960,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_list_workspace_node_item(
+    List<WorkspaceNodeItem> self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_i_32(self.length, serializer);
+    for (final item in self) {
+      sse_encode_workspace_node_item(item, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_note_item(NoteItem self, SseSerializer serializer) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_String(self.atomId, serializer);
@@ -1672,6 +2051,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  void sse_encode_opt_box_autoadd_workspace_node_item(
+    WorkspaceNodeItem? self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+
+    sse_encode_bool(self != null, serializer);
+    if (self != null) {
+      sse_encode_box_autoadd_workspace_node_item(self, serializer);
+    }
+  }
+
+  @protected
   void sse_encode_tags_list_response(
     TagsListResponse self,
     SseSerializer serializer,
@@ -1709,6 +2101,44 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     sse_encode_bool(self.ok, serializer);
     sse_encode_opt_String(self.errorCode, serializer);
     sse_encode_String(self.message, serializer);
+  }
+
+  @protected
+  void sse_encode_workspace_list_children_response(
+    WorkspaceListChildrenResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_opt_String(self.errorCode, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_list_workspace_node_item(self.items, serializer);
+  }
+
+  @protected
+  void sse_encode_workspace_node_item(
+    WorkspaceNodeItem self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_String(self.nodeId, serializer);
+    sse_encode_String(self.kind, serializer);
+    sse_encode_opt_String(self.parentNodeId, serializer);
+    sse_encode_opt_String(self.atomId, serializer);
+    sse_encode_String(self.displayName, serializer);
+    sse_encode_i_64(self.sortOrder, serializer);
+  }
+
+  @protected
+  void sse_encode_workspace_node_response(
+    WorkspaceNodeResponse self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_bool(self.ok, serializer);
+    sse_encode_opt_String(self.errorCode, serializer);
+    sse_encode_String(self.message, serializer);
+    sse_encode_opt_box_autoadd_workspace_node_item(self.node, serializer);
   }
 
   @protected

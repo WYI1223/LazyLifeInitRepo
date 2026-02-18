@@ -41,6 +41,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int dco_decode_box_autoadd_u_32(dynamic raw);
 
   @protected
+  WorkspaceNodeItem dco_decode_box_autoadd_workspace_node_item(dynamic raw);
+
+  @protected
   EntryActionResponse dco_decode_entry_action_response(dynamic raw);
 
   @protected
@@ -68,6 +71,9 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List dco_decode_list_prim_u_8_strict(dynamic raw);
 
   @protected
+  List<WorkspaceNodeItem> dco_decode_list_workspace_node_item(dynamic raw);
+
+  @protected
   NoteItem dco_decode_note_item(dynamic raw);
 
   @protected
@@ -89,6 +95,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? dco_decode_opt_box_autoadd_u_32(dynamic raw);
 
   @protected
+  WorkspaceNodeItem? dco_decode_opt_box_autoadd_workspace_node_item(
+    dynamic raw,
+  );
+
+  @protected
   TagsListResponse dco_decode_tags_list_response(dynamic raw);
 
   @protected
@@ -102,6 +113,17 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WorkspaceActionResponse dco_decode_workspace_action_response(dynamic raw);
+
+  @protected
+  WorkspaceListChildrenResponse dco_decode_workspace_list_children_response(
+    dynamic raw,
+  );
+
+  @protected
+  WorkspaceNodeItem dco_decode_workspace_node_item(dynamic raw);
+
+  @protected
+  WorkspaceNodeResponse dco_decode_workspace_node_response(dynamic raw);
 
   @protected
   String sse_decode_String(SseDeserializer deserializer);
@@ -123,6 +145,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   int sse_decode_box_autoadd_u_32(SseDeserializer deserializer);
+
+  @protected
+  WorkspaceNodeItem sse_decode_box_autoadd_workspace_node_item(
+    SseDeserializer deserializer,
+  );
 
   @protected
   EntryActionResponse sse_decode_entry_action_response(
@@ -160,6 +187,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   Uint8List sse_decode_list_prim_u_8_strict(SseDeserializer deserializer);
 
   @protected
+  List<WorkspaceNodeItem> sse_decode_list_workspace_node_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   NoteItem sse_decode_note_item(SseDeserializer deserializer);
 
   @protected
@@ -183,6 +215,11 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   int? sse_decode_opt_box_autoadd_u_32(SseDeserializer deserializer);
 
   @protected
+  WorkspaceNodeItem? sse_decode_opt_box_autoadd_workspace_node_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
   TagsListResponse sse_decode_tags_list_response(SseDeserializer deserializer);
 
   @protected
@@ -196,6 +233,21 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   WorkspaceActionResponse sse_decode_workspace_action_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WorkspaceListChildrenResponse sse_decode_workspace_list_children_response(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WorkspaceNodeItem sse_decode_workspace_node_item(
+    SseDeserializer deserializer,
+  );
+
+  @protected
+  WorkspaceNodeResponse sse_decode_workspace_node_response(
     SseDeserializer deserializer,
   );
 
@@ -231,6 +283,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
 
   @protected
   void sse_encode_box_autoadd_u_32(int self, SseSerializer serializer);
+
+  @protected
+  void sse_encode_box_autoadd_workspace_node_item(
+    WorkspaceNodeItem self,
+    SseSerializer serializer,
+  );
 
   @protected
   void sse_encode_entry_action_response(
@@ -278,6 +336,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   );
 
   @protected
+  void sse_encode_list_workspace_node_item(
+    List<WorkspaceNodeItem> self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_note_item(NoteItem self, SseSerializer serializer);
 
   @protected
@@ -308,6 +372,12 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   void sse_encode_opt_box_autoadd_u_32(int? self, SseSerializer serializer);
 
   @protected
+  void sse_encode_opt_box_autoadd_workspace_node_item(
+    WorkspaceNodeItem? self,
+    SseSerializer serializer,
+  );
+
+  @protected
   void sse_encode_tags_list_response(
     TagsListResponse self,
     SseSerializer serializer,
@@ -325,6 +395,24 @@ abstract class RustLibApiImplPlatform extends BaseApiImpl<RustLibWire> {
   @protected
   void sse_encode_workspace_action_response(
     WorkspaceActionResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_workspace_list_children_response(
+    WorkspaceListChildrenResponse self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_workspace_node_item(
+    WorkspaceNodeItem self,
+    SseSerializer serializer,
+  );
+
+  @protected
+  void sse_encode_workspace_node_response(
+    WorkspaceNodeResponse self,
     SseSerializer serializer,
   );
 

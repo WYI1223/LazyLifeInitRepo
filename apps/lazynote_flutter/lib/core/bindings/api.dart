@@ -6,9 +6,9 @@
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 import 'package:lazynote_flutter/core/bindings/frb_generated.dart';
 
-// These functions are ignored because they are not marked as `pub`: `atom_list_failure`, `atom_type_label`, `atom_update_status_impl`, `calendar_list_by_range_impl`, `calendar_update_event_impl`, `code`, `code`, `code`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `is_db_busy`, `map_db_error`, `map_note_service_error`, `map_repo_error`, `map_task_service_error`, `map_tree_repo_error`, `map_tree_service_error`, `map_workspace_db_error`, `message`, `message`, `message`, `normalize_entry_limit`, `normalize_section_limit`, `note_create_impl`, `note_failure`, `note_get_impl`, `note_set_tags_impl`, `note_update_impl`, `notes_list_impl`, `parse_folder_delete_mode`, `parse_note_id`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `tags_list_impl`, `tasks_list_inbox_impl`, `tasks_list_today_impl`, `tasks_list_upcoming_impl`, `to_atom_list_item`, `to_entry_search_item`, `to_note_item`, `with_atom_service`, `with_note_service`, `with_task_service`, `with_tree_service`, `workspace_delete_folder_impl`, `workspace_failure`
+// These functions are ignored because they are not marked as `pub`: `atom_list_failure`, `atom_type_label`, `atom_update_status_impl`, `calendar_list_by_range_impl`, `calendar_update_event_impl`, `code`, `code`, `code`, `entry_create_note_impl`, `entry_create_task_impl`, `entry_schedule_impl`, `entry_search_impl`, `failure`, `is_db_busy`, `map_db_error`, `map_note_service_error`, `map_repo_error`, `map_task_service_error`, `map_tree_repo_error`, `map_tree_service_error`, `map_workspace_db_error`, `message`, `message`, `message`, `normalize_entry_limit`, `normalize_section_limit`, `note_create_impl`, `note_failure`, `note_get_impl`, `note_set_tags_impl`, `note_update_impl`, `notes_list_impl`, `parse_folder_delete_mode`, `parse_note_id`, `parse_optional_parent_node_id`, `parse_workspace_atom_id`, `parse_workspace_node_id`, `resolve_entry_db_path`, `set_configured_entry_db_path`, `success`, `tags_list_impl`, `tasks_list_inbox_impl`, `tasks_list_today_impl`, `tasks_list_upcoming_impl`, `to_atom_list_item`, `to_entry_search_item`, `to_note_item`, `to_workspace_node_item`, `with_atom_service`, `with_note_service`, `with_task_service`, `with_tree_service`, `workspace_create_folder_impl`, `workspace_create_note_ref_impl`, `workspace_delete_folder_impl`, `workspace_failure`, `workspace_list_children_impl`, `workspace_list_failure`, `workspace_move_node_impl`, `workspace_node_failure`, `workspace_node_kind_label`, `workspace_rename_node_impl`
 // These types are ignored because they are neither used by any `pub` functions nor (for structs and enums) marked `#[frb(unignore)]`: `AtomFfiError`, `NotesFfiError`, `WorkspaceFfiError`
-// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `assert_receiver_is_total_eq`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `clone`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `eq`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`, `fmt`
 
 /// Minimal health-check API for FRB smoke integration.
 ///
@@ -151,6 +151,73 @@ Future<NoteResponse> noteSetTags({
 /// - Async call, DB-backed execution.
 /// - Returns typed envelope with stable error codes.
 Future<TagsListResponse> tagsList() => RustLib.instance.api.crateApiTagsList();
+
+/// Lists workspace child nodes under optional parent.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `parent_node_id` is optional UUID string; `None` lists root-level nodes.
+Future<WorkspaceListChildrenResponse> workspaceListChildren({
+  String? parentNodeId,
+}) => RustLib.instance.api.crateApiWorkspaceListChildren(
+  parentNodeId: parentNodeId,
+);
+
+/// Creates one workspace folder under optional parent.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `parent_node_id` is optional UUID string; `None` creates root-level folder.
+Future<WorkspaceNodeResponse> workspaceCreateFolder({
+  String? parentNodeId,
+  required String name,
+}) => RustLib.instance.api.crateApiWorkspaceCreateFolder(
+  parentNodeId: parentNodeId,
+  name: name,
+);
+
+/// Creates one workspace note_ref under optional parent.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `atom_id` must be UUID string of a note atom.
+Future<WorkspaceNodeResponse> workspaceCreateNoteRef({
+  String? parentNodeId,
+  required String atomId,
+  String? displayName,
+}) => RustLib.instance.api.crateApiWorkspaceCreateNoteRef(
+  parentNodeId: parentNodeId,
+  atomId: atomId,
+  displayName: displayName,
+);
+
+/// Renames one workspace node.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `node_id` must be UUID string.
+Future<WorkspaceActionResponse> workspaceRenameNode({
+  required String nodeId,
+  required String newName,
+}) => RustLib.instance.api.crateApiWorkspaceRenameNode(
+  nodeId: nodeId,
+  newName: newName,
+);
+
+/// Moves one workspace node under optional new parent and target order.
+///
+/// # FFI contract
+/// - Async call, DB-backed execution.
+/// - `new_parent_id = None` moves node to root level.
+Future<WorkspaceActionResponse> workspaceMoveNode({
+  required String nodeId,
+  String? newParentId,
+  PlatformInt64? targetOrder,
+}) => RustLib.instance.api.crateApiWorkspaceMoveNode(
+  nodeId: nodeId,
+  newParentId: newParentId,
+  targetOrder: targetOrder,
+);
 
 /// Deletes one workspace folder by explicit mode (`dissolve|delete_all`).
 ///
@@ -677,4 +744,127 @@ class WorkspaceActionResponse {
           ok == other.ok &&
           errorCode == other.errorCode &&
           message == other.message;
+}
+
+/// Workspace children-list response envelope.
+class WorkspaceListChildrenResponse {
+  /// Whether operation succeeded.
+  final bool ok;
+
+  /// Stable machine-readable error code for failure paths.
+  final String? errorCode;
+
+  /// Human-readable message for diagnostics/UI.
+  final String message;
+
+  /// Child nodes in deterministic order.
+  final List<WorkspaceNodeItem> items;
+
+  const WorkspaceListChildrenResponse({
+    required this.ok,
+    this.errorCode,
+    required this.message,
+    required this.items,
+  });
+
+  @override
+  int get hashCode =>
+      ok.hashCode ^ errorCode.hashCode ^ message.hashCode ^ items.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WorkspaceListChildrenResponse &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          errorCode == other.errorCode &&
+          message == other.message &&
+          items == other.items;
+}
+
+/// Workspace tree node DTO exposed over FFI.
+class WorkspaceNodeItem {
+  /// Stable workspace node id.
+  final String nodeId;
+
+  /// Node kind label (`folder|note_ref`).
+  final String kind;
+
+  /// Parent node id for non-root nodes.
+  final String? parentNodeId;
+
+  /// Target note atom id for note_ref nodes.
+  final String? atomId;
+
+  /// User-facing display name.
+  final String displayName;
+
+  /// Deterministic sibling order key.
+  final PlatformInt64 sortOrder;
+
+  const WorkspaceNodeItem({
+    required this.nodeId,
+    required this.kind,
+    this.parentNodeId,
+    this.atomId,
+    required this.displayName,
+    required this.sortOrder,
+  });
+
+  @override
+  int get hashCode =>
+      nodeId.hashCode ^
+      kind.hashCode ^
+      parentNodeId.hashCode ^
+      atomId.hashCode ^
+      displayName.hashCode ^
+      sortOrder.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WorkspaceNodeItem &&
+          runtimeType == other.runtimeType &&
+          nodeId == other.nodeId &&
+          kind == other.kind &&
+          parentNodeId == other.parentNodeId &&
+          atomId == other.atomId &&
+          displayName == other.displayName &&
+          sortOrder == other.sortOrder;
+}
+
+/// Workspace single-node response envelope.
+class WorkspaceNodeResponse {
+  /// Whether operation succeeded.
+  final bool ok;
+
+  /// Stable machine-readable error code for failure paths.
+  final String? errorCode;
+
+  /// Human-readable message for diagnostics/UI.
+  final String message;
+
+  /// Returned node payload on success.
+  final WorkspaceNodeItem? node;
+
+  const WorkspaceNodeResponse({
+    required this.ok,
+    this.errorCode,
+    required this.message,
+    this.node,
+  });
+
+  @override
+  int get hashCode =>
+      ok.hashCode ^ errorCode.hashCode ^ message.hashCode ^ node.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WorkspaceNodeResponse &&
+          runtimeType == other.runtimeType &&
+          ok == other.ok &&
+          errorCode == other.errorCode &&
+          message == other.message &&
+          node == other.node;
 }

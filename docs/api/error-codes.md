@@ -70,16 +70,24 @@ Producer: `crates/lazynote_ffi/src/api.rs`
 | `atom_not_found` | target atom missing | stale/deleted id | show not-found state and refresh |
 | `db_error` | repository/database failure | sqlite/schema/io issue | show error and allow retry |
 
-## Workspace Tree (FFI) - PR-0221 M2
+## Workspace Tree (FFI) - PR-0203 + PR-0221
 
 Producer: `crates/lazynote_ffi/src/api.rs`
 
 | Code | Meaning | Typical Cause | UI Handling |
 | --- | --- | --- | --- |
-| `invalid_node_id` | folder node id format invalid | non-UUID `node_id` | show validation error, keep dialog open |
+| `invalid_node_id` | node id format invalid | non-UUID `node_id` | show validation error and block request |
+| `invalid_parent_node_id` | parent node id format invalid | non-UUID `parent_node_id` | show validation error and block request |
+| `invalid_atom_id` | atom id format invalid | non-UUID `atom_id` in `workspace_create_note_ref` | show validation error and keep input |
+| `invalid_display_name` | display name is blank after trim | empty folder/rename/display text | show validation error and keep input |
 | `invalid_delete_mode` | delete mode value is unsupported | value not in `dissolve/delete_all` | show validation error, keep current selection |
 | `node_not_found` | target workspace node missing | stale/deleted folder id | refresh tree and show not-found message |
+| `parent_not_found` | target parent node missing | stale/deleted `parent_node_id` | refresh tree and retry with updated parent |
 | `node_not_folder` | target node is not folder kind | caller passed `note_ref` id | show operation invalid error and refresh tree |
+| `parent_not_folder` | target parent is not folder kind | caller passed `note_ref` as parent | show operation invalid error and refresh tree |
+| `atom_not_found` | target atom missing | stale/deleted `atom_id` for note ref creation | show not-found error and refresh note list |
+| `atom_not_note` | target atom is not note type | passed task/event atom to note_ref API | show validation error and block request |
+| `cycle_detected` | move operation would create cycle | moving node under its descendant | show operation invalid error and keep tree unchanged |
 | `db_busy` | repository/database temporarily locked | concurrent sqlite lock contention | show retry affordance and keep pending action |
 | `db_error` | repository/database failure | sqlite/schema/io issue | show error and allow retry |
 | `internal_error` | unexpected invariant failure | unexpected data or service invariant break | show error and capture diagnostics |
