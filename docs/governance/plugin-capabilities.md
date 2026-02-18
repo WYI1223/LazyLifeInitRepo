@@ -22,9 +22,9 @@ Extensions declare runtime permissions in manifest field:
 
 Rules:
 
-- values must be one of `network|file|notification|calendar`
+- values must be one of `network|file|notification|calendar` (lowercase only)
 - values are deduplicated and validated at registration
-- empty declaration is valid
+- empty declaration is valid and means zero runtime permissions
 
 ## Enforcement Contract
 
@@ -34,6 +34,7 @@ Invocation-time authorization uses deny-by-default:
   - returns `Ok(())` only when capability is explicitly declared
   - returns `CapabilityDenied` when capability is undeclared
   - returns `ExtensionNotFound` for unknown extension ids
+- when `runtime_capabilities` is empty, all runtime capability checks are denied
 
 This is a declaration-time and registry-time policy baseline. It does not
 replace process-level sandboxing.

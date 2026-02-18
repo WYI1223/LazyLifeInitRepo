@@ -395,4 +395,12 @@ mod tests {
         let err = manifest.validate().unwrap_err();
         assert_eq!(err, ManifestValidationError::EmptyRuntimeCapability);
     }
+
+    #[test]
+    fn rejects_runtime_capability_list_when_any_item_is_blank() {
+        let mut manifest = valid_manifest();
+        manifest.runtime_capabilities = vec!["network".to_string(), "   ".to_string()];
+        let err = manifest.validate().unwrap_err();
+        assert_eq!(err, ManifestValidationError::EmptyRuntimeCapability);
+    }
 }

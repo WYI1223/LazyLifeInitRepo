@@ -90,3 +90,30 @@ fn runtime_capability_guard_rejects_partial_declaration_access() {
         assert!(matches!(err, ExtensionKernelError::CapabilityDenied { .. }));
     }
 }
+
+#[test]
+fn runtime_capability_guard_is_stable_across_repeated_checks() {
+    let mut registry = ExtensionRegistry::new();
+    let adapter = FirstPartyExtensionAdapter::new(manifest_with_runtime_capabilities(&[
+        "network", "calendar",
+    ]));
+    registry
+        .register_adapter(&adapter)
+        .expect("adapter registration");
+
+    for _ in 0..3 {
+        registry
+            .assert_runtime_capability("builtin.test.capability", RuntimeCapability::Network)
+            .expect("declared capability should remain allowed");
+        registry
+            .assert_runtime_capability("builtin.test.capability", RuntimeCapability::Calendar)
+            .expect("declared capability should remain allowed");
+    }
+
+    for _ in 0..3 {
+        let err = registry
+            .assert_runtime_capability("builtin.test.capability", RuntimeCapability::File)
+            .expect_err("undeclared capability should remain denied");
+        assert!(matches!(err, ExtensionKernelError::CapabilityDenied { .. }));
+    }
+}

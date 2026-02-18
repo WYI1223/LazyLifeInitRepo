@@ -137,6 +137,22 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_lowercase_runtime_capability_variants() {
+        let err =
+            parse_runtime_capability("Network").expect_err("capitalized capability must fail");
+        assert_eq!(
+            err,
+            RuntimeCapabilityError::UnsupportedCapability("Network".to_string())
+        );
+
+        let err = parse_runtime_capability("NETWORK").expect_err("uppercase capability must fail");
+        assert_eq!(
+            err,
+            RuntimeCapabilityError::UnsupportedCapability("NETWORK".to_string())
+        );
+    }
+
+    #[test]
     fn exposes_user_facing_descriptions() {
         assert!(RuntimeCapability::Network.description().contains("network"));
         assert!(RuntimeCapability::File.description().contains("file"));
