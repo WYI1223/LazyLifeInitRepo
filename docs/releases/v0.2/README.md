@@ -134,6 +134,10 @@ Recommended order:
    - `PR-0216-ui-extension-slots`
    - `PR-0217-plugin-capability-model`
    - `PR-0218-api-lifecycle-policy`
+   - post-review hardening sequence:
+     - `P0` (completed): manifest/registry key canonical policy (strict reject non-canonical id/capability/runtime-capability input; add regression tests)
+     - `P1` (completed): slot rendering and execution isolation (render all contributed side_panel entries; isolate callback failures with diagnostics fallback)
+     - `P2` (completed): contract/document closure (capability audit data source statement, EntryCommand boundary statement, lane acceptance refresh)
 3. Workspace lane (depends on bridge lane complete):
    - `PR-0204-workspace-provider-foundation` (addresses R02-1.1/1.2/1.3 by design)
    - `PR-0205-explorer-recursive-lazy-ui`

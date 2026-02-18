@@ -71,6 +71,9 @@ Out of scope:
   - `SettingsCapabilityPage` with extension snapshot + capability catalog
   - Workbench `Settings` section wired from placeholder to audit page
   - widget/smoke tests for capability visibility and route reachability
+- [x] Clarified v0.2 audit data source boundary:
+  - settings capability page uses first-party static snapshot data in v0.2
+  - registry-backed live snapshot query is deferred follow-up work
 
 ## Acceptance Criteria
 

@@ -53,4 +53,10 @@ Runtime capability declarations are:
 
 - manifest-visible in code reviews
 - validated during adapter registration
-- queryable from registered extension snapshots
+- queryable from registered extension snapshots (core contract)
+
+UI baseline note (v0.2):
+
+- `SettingsCapabilityPage` currently renders a first-party static snapshot list
+  for audit visibility
+- runtime registry-backed snapshot wiring is deferred to a follow-up PR

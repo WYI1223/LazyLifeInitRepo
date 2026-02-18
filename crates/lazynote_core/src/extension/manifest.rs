@@ -50,10 +50,14 @@ pub struct ExtensionManifest {
 impl ExtensionManifest {
     /// Validates declaration-level manifest invariants.
     pub fn validate(&self) -> Result<(), ManifestValidationError> {
-        if self.id.trim().is_empty() {
+        let normalized_id = self.id.trim();
+        if normalized_id.is_empty() {
             return Err(ManifestValidationError::EmptyId);
         }
-        if !is_valid_extension_id(self.id.trim()) {
+        if self.id != normalized_id {
+            return Err(ManifestValidationError::NonCanonicalId(self.id.clone()));
+        }
+        if !is_valid_extension_id(normalized_id) {
             return Err(ManifestValidationError::InvalidId(self.id.clone()));
         }
 
@@ -75,6 +79,11 @@ impl ExtensionManifest {
             let normalized = capability.trim();
             if normalized.is_empty() {
                 return Err(ManifestValidationError::EmptyCapability);
+            }
+            if capability != normalized {
+                return Err(ManifestValidationError::NonCanonicalCapability(
+                    capability.clone(),
+                ));
             }
             if !supported_capabilities().contains(&normalized) {
                 return Err(ManifestValidationError::UnsupportedCapability(
@@ -118,6 +127,14 @@ impl ExtensionManifest {
         let mut dedup = BTreeSet::<RuntimeCapability>::new();
         for raw in &self.runtime_capabilities {
             let normalized = raw.trim();
+            if normalized.is_empty() {
+                return Err(ManifestValidationError::EmptyRuntimeCapability);
+            }
+            if raw != normalized {
+                return Err(ManifestValidationError::NonCanonicalRuntimeCapability(
+                    raw.clone(),
+                ));
+            }
             let capability = parse_runtime_capability(normalized).map_err(|err| match err {
                 crate::extension::capability::RuntimeCapabilityError::EmptyCapability => {
                     ManifestValidationError::EmptyRuntimeCapability
@@ -218,14 +235,17 @@ fn is_semver_triplet(value: &str) -> bool {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ManifestValidationError {
     EmptyId,
+    NonCanonicalId(String),
     InvalidId(String),
     EmptyVersion,
     InvalidVersion(String),
     MissingCapabilities,
     EmptyCapability,
+    NonCanonicalCapability(String),
     UnsupportedCapability(String),
     DuplicateCapability(String),
     EmptyRuntimeCapability,
+    NonCanonicalRuntimeCapability(String),
     UnsupportedRuntimeCapability(String),
     DuplicateRuntimeCapability(String),
     MissingEntrypoint(&'static str),
@@ -235,6 +255,12 @@ impl Display for ManifestValidationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::EmptyId => write!(f, "manifest id must not be empty"),
+            Self::NonCanonicalId(value) => {
+                write!(
+                    f,
+                    "manifest id must be canonical (no surrounding whitespace): {value}"
+                )
+            }
             Self::InvalidId(value) => write!(f, "manifest id is invalid: {value}"),
             Self::EmptyVersion => write!(f, "manifest version must not be empty"),
             Self::InvalidVersion(value) => write!(
@@ -243,6 +269,10 @@ impl Display for ManifestValidationError {
             ),
             Self::MissingCapabilities => write!(f, "manifest capabilities must not be empty"),
             Self::EmptyCapability => write!(f, "manifest contains empty capability value"),
+            Self::NonCanonicalCapability(value) => write!(
+                f,
+                "manifest capability must be canonical (no surrounding whitespace): {value}"
+            ),
             Self::UnsupportedCapability(value) => {
                 write!(f, "manifest capability is unsupported: {value}")
             }
@@ -252,6 +282,10 @@ impl Display for ManifestValidationError {
             Self::EmptyRuntimeCapability => {
                 write!(f, "manifest contains empty runtime capability value")
             }
+            Self::NonCanonicalRuntimeCapability(value) => write!(
+                f,
+                "manifest runtime capability must be canonical (no surrounding whitespace): {value}"
+            ),
             Self::UnsupportedRuntimeCapability(value) => {
                 write!(f, "manifest runtime capability is unsupported: {value}")
             }
@@ -359,11 +393,33 @@ mod tests {
     }
 
     #[test]
+    fn rejects_non_canonical_id_with_surrounding_whitespace() {
+        let mut manifest = valid_manifest();
+        manifest.id = " builtin.notes.shell ".to_string();
+        let err = manifest.validate().unwrap_err();
+        assert_eq!(
+            err,
+            ManifestValidationError::NonCanonicalId(" builtin.notes.shell ".to_string())
+        );
+    }
+
+    #[test]
     fn rejects_invalid_version_format() {
         let mut manifest = valid_manifest();
         manifest.version = "v1".to_string();
         let err = manifest.validate().unwrap_err();
         assert!(matches!(err, ManifestValidationError::InvalidVersion(_)));
+    }
+
+    #[test]
+    fn rejects_non_canonical_capability_with_surrounding_whitespace() {
+        let mut manifest = valid_manifest();
+        manifest.capabilities = vec![" command ".to_string(), CAPABILITY_UI_SLOT.to_string()];
+        let err = manifest.validate().unwrap_err();
+        assert_eq!(
+            err,
+            ManifestValidationError::NonCanonicalCapability(" command ".to_string())
+        );
     }
 
     #[test]
@@ -402,5 +458,16 @@ mod tests {
         manifest.runtime_capabilities = vec!["network".to_string(), "   ".to_string()];
         let err = manifest.validate().unwrap_err();
         assert_eq!(err, ManifestValidationError::EmptyRuntimeCapability);
+    }
+
+    #[test]
+    fn rejects_non_canonical_runtime_capability_with_surrounding_whitespace() {
+        let mut manifest = valid_manifest();
+        manifest.runtime_capabilities = vec![" network ".to_string()];
+        let err = manifest.validate().unwrap_err();
+        assert_eq!(
+            err,
+            ManifestValidationError::NonCanonicalRuntimeCapability(" network ".to_string())
+        );
     }
 }

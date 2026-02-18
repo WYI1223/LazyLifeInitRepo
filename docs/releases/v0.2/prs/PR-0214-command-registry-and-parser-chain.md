@@ -15,6 +15,9 @@ In scope:
 - parser chain with priority and deterministic short-circuit behavior
 - conflict handling for duplicate command ids/parser overlaps
 - first-party command migration to registry
+- explicit boundary for command model ownership in v0.2:
+  - `EntryCommand` subtype hierarchy remains first-party internal (`sealed`)
+  - extension point is registry/parser registration, not command subclass export
 
 Out of scope:
 
@@ -58,6 +61,9 @@ Completion snapshot:
   - action-label lookup for detail payloads
 - [x] Migrated Single Entry command execution from hardcoded switch to registry dispatch.
 - [x] Added parser/registry regression tests in `entry_registry_parser_chain_test.dart`.
+- [x] Clarified v0.2 command-model boundary:
+  - `EntryCommand` remains internal/sealed to Flutter app code
+  - extension pluggability is provided by registry/parser contracts
 - [x] Verification passed:
   - `flutter analyze`
   - `flutter test`

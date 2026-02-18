@@ -54,6 +54,9 @@ Out of scope:
   - `docs/index.md`
 - [x] Updated roadmap scope text to reflect lifecycle baseline in v0.2:
   - `docs/product/roadmap.md`
+- [x] Added explicit internal-boundary note for command model:
+  - `EntryCommand` sealed hierarchy is implementation detail, not public API
+  - canonicalized in `docs/governance/api-lifecycle-policy.md`
 
 ## Acceptance Criteria
 

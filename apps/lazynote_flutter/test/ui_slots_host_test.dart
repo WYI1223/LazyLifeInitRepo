@@ -59,6 +59,47 @@ void main() {
     },
   );
 
+  testWidgets(
+    'list host isolates builder failures and keeps healthy contributions',
+    (tester) async {
+      final registry = UiSlotRegistry(
+        contributions: <UiSlotContribution>[
+          UiSlotContribution(
+            contributionId: 'test.slot.broken',
+            slotId: UiSlotIds.workbenchHomeWidgets,
+            layer: UiSlotLayer.homeWidget,
+            priority: 20,
+            builder: (context, slotContext) {
+              throw StateError('broken builder');
+            },
+          ),
+          UiSlotContribution(
+            contributionId: 'test.slot.healthy',
+            slotId: UiSlotIds.workbenchHomeWidgets,
+            layer: UiSlotLayer.homeWidget,
+            priority: 10,
+            builder: (context, slotContext) => const Text('healthy'),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          UiSlotListHost(
+            registry: registry,
+            slotId: UiSlotIds.workbenchHomeWidgets,
+            layer: UiSlotLayer.homeWidget,
+            slotContext: const UiSlotContext(),
+            listBuilder: (context, children) => Column(children: children),
+          ),
+        ),
+      );
+
+      expect(find.text('healthy'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('list host renders fallback when slot has no contribution', (
     tester,
   ) async {
@@ -128,6 +169,47 @@ void main() {
     expect(find.text('fallback'), findsOneWidget);
   });
 
+  testWidgets(
+    'view host skips broken contribution and renders next candidate',
+    (tester) async {
+      final registry = UiSlotRegistry(
+        contributions: <UiSlotContribution>[
+          UiSlotContribution(
+            contributionId: 'test.view.broken',
+            slotId: UiSlotIds.workbenchSectionView,
+            layer: UiSlotLayer.view,
+            priority: 20,
+            builder: (context, slotContext) {
+              throw StateError('broken view builder');
+            },
+          ),
+          UiSlotContribution(
+            contributionId: 'test.view.safe',
+            slotId: UiSlotIds.workbenchSectionView,
+            layer: UiSlotLayer.view,
+            priority: 10,
+            builder: (context, slotContext) => const Text('safe'),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(
+        _wrap(
+          UiSlotViewHost(
+            registry: registry,
+            slotId: UiSlotIds.workbenchSectionView,
+            slotContext: const UiSlotContext(),
+            fallbackBuilder: (context) => const Text('fallback'),
+          ),
+        ),
+      );
+
+      expect(find.text('safe'), findsOneWidget);
+      expect(find.text('fallback'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('slot host lifecycle callbacks run on mount and dispose', (
     tester,
   ) async {
@@ -168,6 +250,42 @@ void main() {
 
     await tester.pumpWidget(build(false));
     expect(events, <String>['mount', 'dispose']);
+  });
+
+  testWidgets('slot host isolates lifecycle callback failures', (tester) async {
+    final registry = UiSlotRegistry(
+      contributions: <UiSlotContribution>[
+        UiSlotContribution(
+          contributionId: 'test.lifecycle.broken',
+          slotId: UiSlotIds.workbenchHomeBlocks,
+          layer: UiSlotLayer.contentBlock,
+          priority: 10,
+          onMount: (slotContext) {
+            throw StateError('mount failure');
+          },
+          onDispose: (slotContext) {
+            throw StateError('dispose failure');
+          },
+          builder: (context, slotContext) => const Text('lifecycle-safe'),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        UiSlotListHost(
+          registry: registry,
+          slotId: UiSlotIds.workbenchHomeBlocks,
+          layer: UiSlotLayer.contentBlock,
+          slotContext: const UiSlotContext(),
+          listBuilder: (context, children) => Column(children: children),
+        ),
+      ),
+    );
+    expect(find.text('lifecycle-safe'), findsOneWidget);
+
+    await tester.pumpWidget(_wrap(const SizedBox.shrink()));
+    expect(tester.takeException(), isNull);
   });
 
   test('registry rejects duplicate contribution id', () {
@@ -265,6 +383,40 @@ void main() {
       slotContext: const UiSlotContext(),
     );
     expect(resolved, isEmpty);
+  });
+
+  test('registry resolve skips contribution when enabledWhen throws', () {
+    final registry = UiSlotRegistry(
+      contributions: <UiSlotContribution>[
+        UiSlotContribution(
+          contributionId: 'test.resolve.broken',
+          slotId: UiSlotIds.workbenchHomeWidgets,
+          layer: UiSlotLayer.homeWidget,
+          priority: 10,
+          enabledWhen: (slotContext) {
+            throw StateError('enabledWhen failure');
+          },
+          builder: (context, slotContext) => const SizedBox.shrink(),
+        ),
+        UiSlotContribution(
+          contributionId: 'test.resolve.healthy',
+          slotId: UiSlotIds.workbenchHomeWidgets,
+          layer: UiSlotLayer.homeWidget,
+          priority: 1,
+          builder: (context, slotContext) => const SizedBox.shrink(),
+        ),
+      ],
+    );
+
+    final resolved = registry.resolve(
+      slotId: UiSlotIds.workbenchHomeWidgets,
+      layer: UiSlotLayer.homeWidget,
+      slotContext: const UiSlotContext(),
+    );
+
+    expect(resolved.map((item) => item.contributionId), <String>[
+      'test.resolve.healthy',
+    ]);
   });
 
   testWidgets('view host updates when slot id changes', (tester) async {

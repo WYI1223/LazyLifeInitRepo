@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_models.dart';
+import 'package:lazynote_flutter/app/ui_slots/ui_slot_registry.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
 import 'package:lazynote_flutter/features/notes/notes_controller.dart';
 import 'package:lazynote_flutter/features/notes/notes_page.dart';
@@ -194,5 +196,61 @@ void main() {
     expect(find.byKey(const Key('notes_list_view')), findsOneWidget);
     expect(find.byKey(const Key('notes_list_item_note-retry')), findsOneWidget);
     expect(detailCalls, ['note-retry']);
+  });
+
+  testWidgets('Notes side_panel renders all slot contributions', (
+    WidgetTester tester,
+  ) async {
+    final controller = NotesController(
+      prepare: () async {},
+      notesListInvoker: ({tag, limit, offset}) async {
+        return const rust_api.NotesListResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          appliedLimit: 50,
+          items: [],
+        );
+      },
+      noteGetInvoker: ({required atomId}) async {
+        return const rust_api.NoteResponse(
+          ok: false,
+          errorCode: 'not_found',
+          message: 'not found',
+          note: null,
+        );
+      },
+    );
+    addTearDown(controller.dispose);
+
+    final registry = UiSlotRegistry(
+      contributions: <UiSlotContribution>[
+        UiSlotContribution(
+          contributionId: 'test.notes.side_panel.one',
+          slotId: UiSlotIds.notesSidePanel,
+          layer: UiSlotLayer.sidePanel,
+          priority: 10,
+          builder: (context, slotContext) => const Text('side-panel-one'),
+        ),
+        UiSlotContribution(
+          contributionId: 'test.notes.side_panel.two',
+          slotId: UiSlotIds.notesSidePanel,
+          layer: UiSlotLayer.sidePanel,
+          priority: 5,
+          builder: (context, slotContext) => const Text('side-panel-two'),
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      wrapWithMaterial(
+        NotesPage(controller: controller, uiSlotRegistry: registry),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('side-panel-one'), findsOneWidget);
+    expect(find.text('side-panel-two'), findsOneWidget);
   });
 }

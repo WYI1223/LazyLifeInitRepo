@@ -396,7 +396,16 @@ class _NotesPageState extends State<NotesPage>
                                 listBuilder: (context, children) {
                                   return children.isEmpty
                                       ? const SizedBox.shrink()
-                                      : children.first;
+                                      : Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.stretch,
+                                          children: children
+                                              .map(
+                                                (child) =>
+                                                    Expanded(child: child),
+                                              )
+                                              .toList(growable: false),
+                                        );
                                 },
                                 fallbackBuilder: (context) {
                                   return NoteExplorer(

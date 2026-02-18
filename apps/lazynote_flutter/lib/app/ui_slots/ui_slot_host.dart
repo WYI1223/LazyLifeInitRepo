@@ -47,21 +47,33 @@ class _UiSlotViewHostState extends State<UiSlotViewHost> {
   @override
   void dispose() {
     for (final contribution in _resolved) {
-      contribution.onDispose?.call(widget.slotContext);
+      _invokeLifecycleSafely(
+        contribution: contribution,
+        stage: 'dispose',
+        slotContext: widget.slotContext,
+        callback: contribution.onDispose,
+      );
     }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final selected = _resolved.isEmpty ? null : _resolved.first;
-    if (selected == null) {
-      return widget.fallbackBuilder(context);
+    for (final contribution in _resolved) {
+      final built = _buildContributionSafely(
+        contribution: contribution,
+        slotContext: widget.slotContext,
+        context: context,
+      );
+      if (built == null) {
+        continue;
+      }
+      return KeyedSubtree(
+        key: ValueKey<String>(contribution.contributionId),
+        child: built,
+      );
     }
-    return KeyedSubtree(
-      key: ValueKey<String>(selected.contributionId),
-      child: selected.builder(context, widget.slotContext),
-    );
+    return widget.fallbackBuilder(context);
   }
 
   List<UiSlotContribution> _resolve() {
@@ -79,7 +91,12 @@ class _UiSlotViewHostState extends State<UiSlotViewHost> {
     final previousIds = previous.map((item) => item.contributionId).toSet();
     for (final contribution in current) {
       if (!previousIds.contains(contribution.contributionId)) {
-        contribution.onMount?.call(widget.slotContext);
+        _invokeLifecycleSafely(
+          contribution: contribution,
+          stage: 'mount',
+          slotContext: widget.slotContext,
+          callback: contribution.onMount,
+        );
       }
     }
   }
@@ -91,7 +108,12 @@ class _UiSlotViewHostState extends State<UiSlotViewHost> {
     final currentIds = current.map((item) => item.contributionId).toSet();
     for (final contribution in previous) {
       if (!currentIds.contains(contribution.contributionId)) {
-        contribution.onDispose?.call(widget.slotContext);
+        _invokeLifecycleSafely(
+          contribution: contribution,
+          stage: 'dispose',
+          slotContext: widget.slotContext,
+          callback: contribution.onDispose,
+        );
       }
     }
   }
@@ -142,7 +164,12 @@ class _UiSlotListHostState extends State<UiSlotListHost> {
   @override
   void dispose() {
     for (final contribution in _resolved) {
-      contribution.onDispose?.call(widget.slotContext);
+      _invokeLifecycleSafely(
+        contribution: contribution,
+        stage: 'dispose',
+        slotContext: widget.slotContext,
+        callback: contribution.onDispose,
+      );
     }
     super.dispose();
   }
@@ -153,14 +180,26 @@ class _UiSlotListHostState extends State<UiSlotListHost> {
       return widget.fallbackBuilder?.call(context) ?? const SizedBox.shrink();
     }
 
-    final children = _resolved
-        .map(
-          (contribution) => KeyedSubtree(
-            key: ValueKey<String>(contribution.contributionId),
-            child: contribution.builder(context, widget.slotContext),
-          ),
-        )
-        .toList(growable: false);
+    final children = <Widget>[];
+    for (final contribution in _resolved) {
+      final built = _buildContributionSafely(
+        contribution: contribution,
+        slotContext: widget.slotContext,
+        context: context,
+      );
+      if (built == null) {
+        continue;
+      }
+      children.add(
+        KeyedSubtree(
+          key: ValueKey<String>(contribution.contributionId),
+          child: built,
+        ),
+      );
+    }
+    if (children.isEmpty) {
+      return widget.fallbackBuilder?.call(context) ?? const SizedBox.shrink();
+    }
     return widget.listBuilder(context, children);
   }
 
@@ -179,7 +218,12 @@ class _UiSlotListHostState extends State<UiSlotListHost> {
     final previousIds = previous.map((item) => item.contributionId).toSet();
     for (final contribution in current) {
       if (!previousIds.contains(contribution.contributionId)) {
-        contribution.onMount?.call(widget.slotContext);
+        _invokeLifecycleSafely(
+          contribution: contribution,
+          stage: 'mount',
+          slotContext: widget.slotContext,
+          callback: contribution.onMount,
+        );
       }
     }
   }
@@ -191,8 +235,72 @@ class _UiSlotListHostState extends State<UiSlotListHost> {
     final currentIds = current.map((item) => item.contributionId).toSet();
     for (final contribution in previous) {
       if (!currentIds.contains(contribution.contributionId)) {
-        contribution.onDispose?.call(widget.slotContext);
+        _invokeLifecycleSafely(
+          contribution: contribution,
+          stage: 'dispose',
+          slotContext: widget.slotContext,
+          callback: contribution.onDispose,
+        );
       }
     }
   }
+}
+
+Widget? _buildContributionSafely({
+  required UiSlotContribution contribution,
+  required UiSlotContext slotContext,
+  required BuildContext context,
+}) {
+  try {
+    return contribution.builder(context, slotContext);
+  } catch (error, stackTrace) {
+    _reportUiSlotHostError(
+      contribution: contribution,
+      error: error,
+      stackTrace: stackTrace,
+      stage: 'build',
+    );
+    return null;
+  }
+}
+
+void _invokeLifecycleSafely({
+  required UiSlotContribution contribution,
+  required String stage,
+  required UiSlotContext slotContext,
+  required UiSlotLifecycleCallback? callback,
+}) {
+  if (callback == null) {
+    return;
+  }
+  try {
+    callback(slotContext);
+  } catch (error, stackTrace) {
+    _reportUiSlotHostError(
+      contribution: contribution,
+      error: error,
+      stackTrace: stackTrace,
+      stage: stage,
+    );
+  }
+}
+
+void _reportUiSlotHostError({
+  required UiSlotContribution contribution,
+  required Object error,
+  required StackTrace stackTrace,
+  required String stage,
+}) {
+  debugPrint(
+    '[ui_slots] host error ($stage) '
+    '${contribution.slotId}/${contribution.contributionId}: $error',
+  );
+  assert(() {
+    debugPrintStack(
+      label:
+          '[ui_slots] host stack ${contribution.slotId}/${contribution.contributionId}',
+      stackTrace: stackTrace,
+    );
+    return true;
+  }());
 }

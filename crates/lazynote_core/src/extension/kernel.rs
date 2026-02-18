@@ -248,7 +248,9 @@ impl Error for ExtensionKernelError {}
 #[cfg(test)]
 mod tests {
     use crate::extension::capability::RuntimeCapability;
-    use crate::extension::manifest::{ExtensionManifest, ManifestEntrypoints};
+    use crate::extension::manifest::{
+        ExtensionManifest, ManifestEntrypoints, ManifestValidationError,
+    };
 
     use super::{
         ExtensionInvocation, ExtensionKernelError, ExtensionRegistry, ExtensionSource,
@@ -408,5 +410,23 @@ mod tests {
                 ExtensionInvocation::CalendarAccess,
             )
             .expect("calendar access should be allowed");
+    }
+
+    #[test]
+    fn rejects_registration_with_non_canonical_capability_strings() {
+        let mut registry = ExtensionRegistry::new();
+        let mut manifest = runtime_manifest(&["network"]);
+        manifest.capabilities = vec![" provider ".to_string()];
+        let adapter = FirstPartyExtensionAdapter::new(manifest);
+
+        let err = registry
+            .register_adapter(&adapter)
+            .expect_err("non-canonical capability should be rejected");
+        assert!(matches!(
+            err,
+            ExtensionKernelError::InvalidManifest(ManifestValidationError::NonCanonicalCapability(
+                _
+            ))
+        ));
     }
 }

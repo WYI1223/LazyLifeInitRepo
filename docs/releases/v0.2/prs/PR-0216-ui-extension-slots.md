@@ -68,6 +68,9 @@ Completion snapshot:
   - duplicate registration rejection
 - [x] Added architecture contract doc:
   - `docs/architecture/ui-extension-slots.md`
+- [x] Post-review hardening synced:
+  - Notes `side_panel` now renders all resolved contributions (not first-only)
+  - host/registry isolate per-contribution callback failures and continue rendering
 
 ## Acceptance Criteria
 

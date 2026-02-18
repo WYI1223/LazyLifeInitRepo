@@ -46,7 +46,8 @@ Each `UiSlotContribution` declares:
 - rejects empty/duplicate `contribution_id`
 - rejects empty `slot_id`
 - resolves by `(slot_id, layer, enabled_when)`
-  - `enabled_when` should be pure and must not throw runtime exceptions
+  - `enabled_when` should be pure
+  - if `enabled_when` throws, that contribution is skipped and diagnostics are logged
 - sorts deterministically by:
   1. `priority` descending
   2. `contribution_id` ascending
@@ -59,12 +60,16 @@ Each `UiSlotContribution` declares:
 - renders all resolved contributions in registry order
 - uses fallback when no contribution is resolved
 - if fallback is not provided, renders `SizedBox.shrink()`
+- isolates per-contribution failures:
+  - if one `builder` throws, that contribution is skipped
+  - `on_mount`/`on_dispose` exceptions are logged and do not abort host updates
 
 `UiSlotViewHost`:
 
 - used for `view`
 - renders only highest-priority resolved contribution
 - uses fallback when no contribution is resolved
+- if highest-priority contribution `builder` throws, host falls through to the next contribution
 
 Lifecycle:
 

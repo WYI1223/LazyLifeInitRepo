@@ -13,6 +13,17 @@ so changes are explicit, reviewable, and reversible.
   `docs/architecture/provider-spi.md`)
 - behavior contracts in `docs/api/*.md`
 
+## Non-API Internal Boundaries
+
+The following are implementation details and not treated as external API
+surfaces in v0.2:
+
+- Flutter `EntryCommand` subtype hierarchy in
+  `apps/lazynote_flutter/lib/features/entry/command_parser.dart`
+  - currently `sealed` and intentionally internal to first-party app code
+  - extension integration point is registry/parser contracts, not external
+    subclassing of `EntryCommand`
+
 ## Stability Classes
 
 ### `experimental`

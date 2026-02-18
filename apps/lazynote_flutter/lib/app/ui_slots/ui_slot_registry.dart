@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:lazynote_flutter/app/ui_slots/ui_slot_models.dart';
 
 /// In-process UI slot registry.
@@ -63,7 +64,17 @@ class UiSlotRegistry {
       if (contribution.slotId != normalizedSlotId) {
         return false;
       }
-      return contribution.enabledWhen?.call(slotContext) ?? true;
+      try {
+        return contribution.enabledWhen?.call(slotContext) ?? true;
+      } catch (error, stackTrace) {
+        _reportUiSlotResolveError(
+          contribution: contribution,
+          error: error,
+          stackTrace: stackTrace,
+          stage: 'enabled_when',
+        );
+        return false;
+      }
     }).toList();
 
     resolved.sort((left, right) {
@@ -78,4 +89,24 @@ class UiSlotRegistry {
 
   /// Number of registered slot contributions.
   int get length => _contributionsById.length;
+}
+
+void _reportUiSlotResolveError({
+  required UiSlotContribution contribution,
+  required Object error,
+  required StackTrace stackTrace,
+  required String stage,
+}) {
+  debugPrint(
+    '[ui_slots] resolve error ($stage) '
+    '${contribution.slotId}/${contribution.contributionId}: $error',
+  );
+  assert(() {
+    debugPrintStack(
+      label:
+          '[ui_slots] resolve stack ${contribution.slotId}/${contribution.contributionId}',
+      stackTrace: stackTrace,
+    );
+    return true;
+  }());
 }
