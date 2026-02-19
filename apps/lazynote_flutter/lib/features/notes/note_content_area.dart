@@ -7,10 +7,19 @@ import 'package:lazynote_flutter/features/notes/notes_style.dart';
 
 /// Center editor/content area for active note.
 class NoteContentArea extends StatelessWidget {
-  const NoteContentArea({super.key, required this.controller});
+  const NoteContentArea({
+    super.key,
+    required this.controller,
+    this.activeNoteIdOverride,
+    this.activeDraftContentOverride,
+    this.noteSaveStateOverride,
+  });
 
   /// Shared notes controller used to read list/detail snapshots.
   final NotesController controller;
+  final String? activeNoteIdOverride;
+  final String? activeDraftContentOverride;
+  final NoteSaveState? noteSaveStateOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +46,10 @@ class NoteContentArea extends StatelessWidget {
   }
 
   Widget _buildContent(BuildContext context) {
-    final atomId = controller.activeNoteId;
+    final atomId = activeNoteIdOverride ?? controller.activeNoteId;
+    final noteSaveState = noteSaveStateOverride ?? controller.noteSaveState;
+    final activeDraftContent =
+        activeDraftContentOverride ?? controller.activeDraftContent;
     switch (controller.listPhase) {
       case NotesListPhase.idle:
       case NotesListPhase.loading:
@@ -120,6 +132,7 @@ class NoteContentArea extends StatelessWidget {
                       _TopActionCluster(
                         controller: controller,
                         compact: compactActions,
+                        noteSaveState: noteSaveState,
                       ),
                       if (controller.detailLoading)
                         const SizedBox(
@@ -152,7 +165,7 @@ class NoteContentArea extends StatelessWidget {
                   ),
                 ),
               ],
-              if (controller.noteSaveState == NoteSaveState.error &&
+              if (noteSaveState == NoteSaveState.error &&
                   saveError != null) ...[
                 const SizedBox(height: 10),
                 Container(
@@ -227,7 +240,7 @@ class NoteContentArea extends StatelessWidget {
               Expanded(
                 child: NoteEditor(
                   key: ValueKey<String>('note_editor_$atomId'),
-                  content: controller.activeDraftContent,
+                  content: activeDraftContent,
                   focusRequestId: controller.editorFocusRequestId,
                   onChanged: controller.updateActiveDraft,
                 ),
@@ -312,14 +325,19 @@ class _TopActionButton extends StatelessWidget {
 }
 
 class _SaveStatusWidget extends StatelessWidget {
-  const _SaveStatusWidget({required this.controller, required this.compact});
+  const _SaveStatusWidget({
+    required this.controller,
+    required this.compact,
+    required this.noteSaveState,
+  });
 
   final NotesController controller;
   final bool compact;
+  final NoteSaveState noteSaveState;
 
   @override
   Widget build(BuildContext context) {
-    switch (controller.noteSaveState) {
+    switch (noteSaveState) {
       case NoteSaveState.clean:
         if (!controller.showSavedBadge) {
           return const SizedBox(
@@ -434,17 +452,26 @@ class _SaveStatusWidget extends StatelessWidget {
 enum _TopOverflowAction { share, star, more }
 
 class _TopActionCluster extends StatelessWidget {
-  const _TopActionCluster({required this.controller, required this.compact});
+  const _TopActionCluster({
+    required this.controller,
+    required this.compact,
+    required this.noteSaveState,
+  });
 
   final NotesController controller;
   final bool compact;
+  final NoteSaveState noteSaveState;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _SaveStatusWidget(controller: controller, compact: compact),
+        _SaveStatusWidget(
+          controller: controller,
+          compact: compact,
+          noteSaveState: noteSaveState,
+        ),
         const SizedBox(width: 6),
         IconButton(
           key: const Key('notes_detail_refresh_button'),

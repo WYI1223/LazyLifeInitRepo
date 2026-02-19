@@ -7,10 +7,17 @@ enum _TabContextAction { close, closeOthers, closeRight }
 
 /// Top tab strip managing currently opened notes.
 class NoteTabManager extends StatefulWidget {
-  const NoteTabManager({super.key, required this.controller});
+  const NoteTabManager({
+    super.key,
+    required this.controller,
+    this.openNoteIdsOverride,
+    this.activeNoteIdOverride,
+  });
 
   /// Shared notes controller that owns open-tab and active-tab state.
   final NotesController controller;
+  final List<String>? openNoteIdsOverride;
+  final String? activeNoteIdOverride;
 
   @override
   State<NoteTabManager> createState() => _NoteTabManagerState();
@@ -83,7 +90,11 @@ class _NoteTabManagerState extends State<NoteTabManager> {
   }
 
   Widget _buildTabStrip(BuildContext context) {
-    if (widget.controller.openNoteIds.isEmpty) {
+    final openNoteIds =
+        widget.openNoteIdsOverride ?? widget.controller.openNoteIds;
+    final activeNoteId =
+        widget.activeNoteIdOverride ?? widget.controller.activeNoteId;
+    if (openNoteIds.isEmpty) {
       return Center(
         child: Text(
           'No open notes',
@@ -103,14 +114,14 @@ class _NoteTabManagerState extends State<NoteTabManager> {
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
               padding: EdgeInsets.zero,
-              itemCount: widget.controller.openNoteIds.length,
+              itemCount: openNoteIds.length,
               separatorBuilder: (_, _) => const SizedBox(
                 width: 1,
                 child: ColoredBox(color: kNotesDividerColor),
               ),
               itemBuilder: (context, index) {
-                final noteId = widget.controller.openNoteIds[index];
-                final active = noteId == widget.controller.activeNoteId;
+                final noteId = openNoteIds[index];
+                final active = noteId == activeNoteId;
                 return _buildTabChip(context, noteId: noteId, active: active);
               },
             ),

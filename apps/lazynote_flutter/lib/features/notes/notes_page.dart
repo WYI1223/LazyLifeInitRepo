@@ -12,6 +12,7 @@ import 'package:lazynote_flutter/features/notes/note_explorer.dart';
 import 'package:lazynote_flutter/features/notes/note_tab_manager.dart';
 import 'package:lazynote_flutter/features/notes/notes_controller.dart';
 import 'package:lazynote_flutter/features/notes/notes_style.dart';
+import 'package:lazynote_flutter/features/workspace/workspace_models.dart';
 import 'package:window_manager/window_manager.dart';
 
 /// Notes feature page mounted in Workbench left pane (PR-0010C foundation).
@@ -64,7 +65,9 @@ class _NotesPageState extends State<NotesPage>
     _controller.addListener(_onControllerChanged);
     unawaited(_setupWindowCloseGuard());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _controller.loadNotes();
+      if (_controller.listPhase == NotesListPhase.idle) {
+        _controller.loadNotes();
+      }
     });
   }
 
@@ -244,6 +247,10 @@ class _NotesPageState extends State<NotesPage>
 
   @override
   Widget build(BuildContext context) {
+    final mergedListenable = Listenable.merge([
+      _controller,
+      _controller.workspaceProvider,
+    ]);
     return Shortcuts(
       shortcuts: const {
         SingleActivator(LogicalKeyboardKey.tab, control: true):
@@ -269,8 +276,25 @@ class _NotesPageState extends State<NotesPage>
         child: Focus(
           autofocus: true,
           child: AnimatedBuilder(
-            animation: _controller,
+            animation: mergedListenable,
             builder: (context, _) {
+              final workspace = _controller.workspaceProvider;
+              final workspaceOpenTabs =
+                  workspace.openTabsByPane[workspace.activePaneId] ??
+                  const <String>[];
+              final openTabOverride = workspaceOpenTabs.isEmpty
+                  ? null
+                  : List<String>.unmodifiable(workspaceOpenTabs);
+              final activeNoteIdOverride = workspace.activeNoteId;
+              final draftOverride = activeNoteIdOverride == null
+                  ? null
+                  : workspace.activeDraftContent;
+              final activeWorkspaceSaveState = activeNoteIdOverride == null
+                  ? null
+                  : workspace.saveStateByNoteId[activeNoteIdOverride];
+              final noteSaveStateOverride = _mapWorkspaceSaveState(
+                activeWorkspaceSaveState,
+              );
               return LayoutBuilder(
                 builder: (context, constraints) {
                   final compactHeader = constraints.maxWidth < 860;
@@ -454,10 +478,19 @@ class _NotesPageState extends State<NotesPage>
                             Expanded(
                               child: Column(
                                 children: [
-                                  NoteTabManager(controller: _controller),
+                                  NoteTabManager(
+                                    controller: _controller,
+                                    openNoteIdsOverride: openTabOverride,
+                                    activeNoteIdOverride: activeNoteIdOverride,
+                                  ),
                                   Expanded(
                                     child: NoteContentArea(
                                       controller: _controller,
+                                      activeNoteIdOverride:
+                                          activeNoteIdOverride,
+                                      activeDraftContentOverride: draftOverride,
+                                      noteSaveStateOverride:
+                                          noteSaveStateOverride,
                                     ),
                                   ),
                                 ],
@@ -475,5 +508,20 @@ class _NotesPageState extends State<NotesPage>
         ),
       ),
     );
+  }
+
+  NoteSaveState? _mapWorkspaceSaveState(WorkspaceSaveState? state) {
+    switch (state) {
+      case WorkspaceSaveState.clean:
+        return NoteSaveState.clean;
+      case WorkspaceSaveState.dirty:
+        return NoteSaveState.dirty;
+      case WorkspaceSaveState.saving:
+        return NoteSaveState.saving;
+      case WorkspaceSaveState.saveError:
+        return NoteSaveState.error;
+      case null:
+        return null;
+    }
   }
 }

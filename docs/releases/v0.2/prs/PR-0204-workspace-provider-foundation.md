@@ -1,7 +1,7 @@
 # PR-0204-workspace-provider-foundation
 
 - Proposed title: `feat(notes-ui): workspace provider and state hoisting foundation`
-- Status: In Progress (M1+M2 landed; UI wiring pending)
+- Status: Completed
 
 ## Goal
 
@@ -104,6 +104,10 @@ Status:
 2. Keep split/explorer visual behavior unchanged (no recursive split in v0.2).
 3. Run full regression suite before PR-0205 handoff.
 
+Status:
+- M3 selector wiring: completed
+- M3 regression verification: completed
+
 ## Planned File Changes
 
 - [add] `apps/lazynote_flutter/lib/features/workspace/workspace_provider.dart`
@@ -119,11 +123,12 @@ Status:
 - `cd apps/lazynote_flutter && flutter analyze`
 - `cd apps/lazynote_flutter && flutter test test/workspace_provider_test.dart`
 - `cd apps/lazynote_flutter && flutter test test/notes_controller_workspace_bridge_test.dart`
+- `cd apps/lazynote_flutter && flutter test test/notes_page_c1_test.dart test/notes_page_c2_test.dart test/notes_page_c3_test.dart test/notes_page_c4_test.dart test/smoke_test.dart`
 - `cd apps/lazynote_flutter && flutter test`
 
 ## Acceptance Criteria
 
-- [ ] Notes buffers are provider-owned and reusable by future pane layouts.
+- [x] Notes buffers are provider-owned and reusable by future pane layouts.
 - [x] Active pane and tab state are explicit and test-covered.
 - [x] Existing v0.1 note flows still pass.
 - [x] NotesController bridge keeps tab/draft/save snapshots synchronized with
