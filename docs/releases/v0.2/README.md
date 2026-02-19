@@ -74,6 +74,7 @@ In scope:
 - workspace tree delete policy (hybrid C+B semantics) (`PR-0221`)
 - tree FFI contracts + docs update (`PR-0203`)
 - workspace provider foundation 鈥?incl. R02-1.1/1.2/1.3 design constraints (`PR-0204`)
+- notes shell style alignment with shared UI standards (`PR-0205A`)
 - recursive explorer UI with lazy loading (`PR-0205`)
 - split layout v1 (limited split, min-size guard) (`PR-0206`)
 - explorer context actions + drag-reorder baseline (`PR-0207`)
@@ -143,6 +144,7 @@ Recommended order:
      - `P2` (completed): contract/document closure (capability audit data source statement, EntryCommand boundary statement, lane acceptance refresh)
 3. Workspace lane (depends on bridge lane complete):
    - `PR-0204-workspace-provider-foundation` (addresses R02-1.1/1.2/1.3 by design)
+   - `PR-0205A-notes-ui-shell-alignment`
    - `PR-0205-explorer-recursive-lazy-ui`
    - `PR-0206-split-layout-v1`
    - `PR-0207-explorer-context-actions-dnd-baseline`
@@ -213,6 +215,7 @@ Feature lanes:
 - `docs/releases/v0.2/prs/PR-0221-workspace-tree-delete-policy-hybrid.md`
 - `docs/releases/v0.2/prs/PR-0203-tree-ffi-contracts.md`
 - `docs/releases/v0.2/prs/PR-0204-workspace-provider-foundation.md`
+- `docs/releases/v0.2/prs/PR-0205A-notes-ui-shell-alignment.md`
 - `docs/releases/v0.2/prs/PR-0205-explorer-recursive-lazy-ui.md`
 - `docs/releases/v0.2/prs/PR-0206-split-layout-v1.md`
 - `docs/releases/v0.2/prs/PR-0207-explorer-context-actions-dnd-baseline.md`
