@@ -1,7 +1,7 @@
 # PR-0204-workspace-provider-foundation
 
 - Proposed title: `feat(notes-ui): workspace provider and state hoisting foundation`
-- Status: In Progress (M1 skeleton landed; integration pending)
+- Status: In Progress (M1+M2 landed; UI wiring pending)
 
 ## Goal
 
@@ -94,6 +94,10 @@ Status:
 2. Preserve existing Notes behavior while moving ownership to provider.
 3. Add bridge-focused tests for tab/draft/save consistency.
 
+Status:
+- M2 controller bridge: completed
+- M2 bridge tests: completed
+
 ### M3. UI Wiring Baseline
 
 1. Wire `notes_page`/`entry_shell_page` to provider selectors.
@@ -108,21 +112,25 @@ Status:
 - [edit] `apps/lazynote_flutter/lib/features/notes/notes_page.dart`
 - [edit] `apps/lazynote_flutter/lib/features/entry/entry_shell_page.dart`
 - [add] `apps/lazynote_flutter/test/workspace_provider_test.dart`
+- [add] `apps/lazynote_flutter/test/notes_controller_workspace_bridge_test.dart`
 
 ## Verification
 
 - `cd apps/lazynote_flutter && flutter analyze`
 - `cd apps/lazynote_flutter && flutter test test/workspace_provider_test.dart`
+- `cd apps/lazynote_flutter && flutter test test/notes_controller_workspace_bridge_test.dart`
 - `cd apps/lazynote_flutter && flutter test`
 
 ## Acceptance Criteria
 
 - [ ] Notes buffers are provider-owned and reusable by future pane layouts.
-- [ ] Active pane and tab state are explicit and test-covered.
-- [ ] Existing v0.1 note flows still pass.
-- [ ] (R02-1.1) Active draft content is always derived from `buffersByNoteId`; no stale
+- [x] Active pane and tab state are explicit and test-covered.
+- [x] Existing v0.1 note flows still pass.
+- [x] NotesController bridge keeps tab/draft/save snapshots synchronized with
+      `WorkspaceProvider` in regression tests.
+- [x] (R02-1.1) Active draft content is always derived from `buffersByNoteId`; no stale
       content appears after tab/pane switch in widget tests.
-- [ ] (R02-1.2) Save flush coordinator has a bounded retry count (≤ 5) and transitions to
+- [x] (R02-1.2) Save flush coordinator has a bounded retry count (≤ 5) and transitions to
       `save_error` on exhaustion; test covers the save-failure + in-progress-typing case.
-- [ ] (R02-1.3) Tag mutation dispatch checks note presence in open tabs before FFI call;
+- [x] (R02-1.3) Tag mutation dispatch checks note presence in open tabs before FFI call;
       test covers close-then-tag-queue scenario.

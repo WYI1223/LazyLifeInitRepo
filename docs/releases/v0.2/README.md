@@ -159,7 +159,8 @@ Recommended order:
 
 1. `PR-0204` M1 skeleton (workspace provider interface freeze)
    - [x] add provider/models baseline and guardrail tests for R02-1.1/1.2/1.3
-   - [ ] bridge `NotesController` ownership to provider (M2)
+   - [x] bridge `NotesController` ownership to provider (M2)
+   - [ ] wire `notes_page`/`entry_shell_page` to provider selectors (M3)
 2. `PR-0202/0203/0221` migration + contract consistency audit
    - [ ] run migration-chain replay and FFI contract regression
 3. Extension x Workspace integration smoke (minimal CI sample)

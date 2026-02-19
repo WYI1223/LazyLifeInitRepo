@@ -4,6 +4,8 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
 import 'package:lazynote_flutter/core/rust_bridge.dart';
+import 'package:lazynote_flutter/features/workspace/workspace_models.dart';
+import 'package:lazynote_flutter/features/workspace/workspace_provider.dart';
 
 /// Async list loader for Notes v0.1 UI flow.
 typedef NotesListInvoker =
@@ -111,6 +113,7 @@ class NotesController extends ChangeNotifier {
     TagsListInvoker? tagsListInvoker,
     NoteSetTagsInvoker? noteSetTagsInvoker,
     WorkspaceDeleteFolderInvoker? workspaceDeleteFolderInvoker,
+    WorkspaceProvider? workspaceProvider,
     DebounceTimerFactory? debounceTimerFactory,
     NotesPrepare? prepare,
     this.listLimit = 50,
@@ -124,7 +127,15 @@ class NotesController extends ChangeNotifier {
        _workspaceDeleteFolderInvoker =
            workspaceDeleteFolderInvoker ?? _defaultWorkspaceDeleteFolderInvoker,
        _debounceTimerFactory = debounceTimerFactory ?? Timer.new,
-       _prepare = prepare ?? _defaultPrepare;
+       _prepare = prepare ?? _defaultPrepare {
+    _workspaceProvider =
+        workspaceProvider ??
+        WorkspaceProvider(
+          autosaveDebounce: autosaveDebounce,
+          autosaveEnabled: false,
+        );
+    _ownsWorkspaceProvider = workspaceProvider == null;
+  }
 
   final NotesListInvoker _notesListInvoker;
   final NoteGetInvoker _noteGetInvoker;
@@ -135,6 +146,8 @@ class NotesController extends ChangeNotifier {
   final WorkspaceDeleteFolderInvoker _workspaceDeleteFolderInvoker;
   final DebounceTimerFactory _debounceTimerFactory;
   final NotesPrepare _prepare;
+  late final WorkspaceProvider _workspaceProvider;
+  late final bool _ownsWorkspaceProvider;
 
   /// Requested list limit for C1 list baseline.
   final int listLimit;
@@ -212,10 +225,18 @@ class NotesController extends ChangeNotifier {
   String? get selectedAtomId => _activeNoteId;
 
   /// Currently active tab note id.
-  String? get activeNoteId => _activeNoteId;
+  String? get activeNoteId => _workspaceProvider.activeNoteId ?? _activeNoteId;
 
   /// Currently opened tab ids in order.
-  List<String> get openNoteIds => List.unmodifiable(_openNoteIds);
+  List<String> get openNoteIds {
+    final workspaceTabs =
+        _workspaceProvider.openTabsByPane[_workspaceProvider.activePaneId] ??
+        const <String>[];
+    if (workspaceTabs.isEmpty) {
+      return List.unmodifiable(_openNoteIds);
+    }
+    return List.unmodifiable(workspaceTabs);
+  }
 
   /// Selected note detail payload used by right pane.
   rust_api.NoteItem? get selectedNote => _selectedNote;
@@ -243,6 +264,9 @@ class NotesController extends ChangeNotifier {
 
   /// Last workspace folder delete failure message.
   String? get workspaceDeleteErrorMessage => _workspaceDeleteErrorMessage;
+
+  /// Workspace state owner used by Notes bridge (M2).
+  WorkspaceProvider get workspaceProvider => _workspaceProvider;
 
   /// Returns and clears the latest non-fatal create warning.
   String? takeCreateWarningMessage() {
@@ -288,6 +312,12 @@ class NotesController extends ChangeNotifier {
 
   /// In-memory draft content for active editor instance.
   String get activeDraftContent {
+    final workspaceActive = _workspaceProvider.activeNoteId;
+    if (workspaceActive != null &&
+        _workspaceProvider.buffersByNoteId.containsKey(workspaceActive)) {
+      return _workspaceProvider.activeDraftContent;
+    }
+
     if (_activeNoteId == null) {
       return '';
     }
@@ -310,6 +340,9 @@ class NotesController extends ChangeNotifier {
   void dispose() {
     _autosaveTimer?.cancel();
     _savedBadgeTimer?.cancel();
+    if (_ownsWorkspaceProvider) {
+      _workspaceProvider.dispose();
+    }
     super.dispose();
   }
 
@@ -657,6 +690,7 @@ class NotesController extends ChangeNotifier {
       _autosaveTimer?.cancel();
       _setSaveState(NoteSaveState.clean);
       _requestEditorFocus();
+      _syncWorkspaceFromControllerState();
       notifyListeners();
 
       await _refreshAvailableTags(showLoading: false);
@@ -835,11 +869,13 @@ class NotesController extends ChangeNotifier {
       _activeDraftContent = '';
       _autosaveTimer?.cancel();
       _setSaveState(NoteSaveState.clean);
+      _syncWorkspaceFromControllerState();
       notifyListeners();
       return;
     }
 
     if (!activeRemoved) {
+      _syncWorkspaceFromControllerState();
       notifyListeners();
       return;
     }
@@ -855,6 +891,7 @@ class NotesController extends ChangeNotifier {
         _draftContentByAtomId[fallbackId] ?? _selectedNote?.content ?? '';
     _refreshSaveStateForActive();
     _requestEditorFocus();
+    _syncWorkspaceFromControllerState();
     notifyListeners();
     await _loadSelectedDetail(atomId: fallbackId);
   }
@@ -934,6 +971,7 @@ class NotesController extends ChangeNotifier {
         } else {
           _setSaveState(NoteSaveState.clean, showSavedBadge: true);
         }
+        _syncWorkspaceActiveSnapshot();
       }
       notifyListeners();
 
@@ -997,6 +1035,7 @@ class NotesController extends ChangeNotifier {
     _refreshSaveStateForActive();
     _requestEditorFocus();
     _switchBlockErrorMessage = null;
+    _syncWorkspaceFromControllerState();
     notifyListeners();
 
     await _loadSelectedDetail(atomId: atomId);
@@ -1062,6 +1101,7 @@ class NotesController extends ChangeNotifier {
 
     _openNoteIds.removeAt(closedIndex);
     if (_activeNoteId != atomId) {
+      _syncWorkspaceFromControllerState();
       notifyListeners();
       return true;
     }
@@ -1075,6 +1115,7 @@ class NotesController extends ChangeNotifier {
       _activeDraftContent = '';
       _autosaveTimer?.cancel();
       _setSaveState(NoteSaveState.clean);
+      _syncWorkspaceFromControllerState();
       notifyListeners();
       return true;
     }
@@ -1088,6 +1129,7 @@ class NotesController extends ChangeNotifier {
         _draftContentByAtomId[fallbackId] ?? _selectedNote?.content ?? '';
     _refreshSaveStateForActive();
     _requestEditorFocus();
+    _syncWorkspaceFromControllerState();
     notifyListeners();
     await _loadSelectedDetail(atomId: fallbackId);
     return true;
@@ -1107,6 +1149,7 @@ class NotesController extends ChangeNotifier {
     _openNoteIds
       ..clear()
       ..add(atomId);
+    _syncWorkspaceFromControllerState();
     notifyListeners();
     return true;
   }
@@ -1145,10 +1188,12 @@ class NotesController extends ChangeNotifier {
           _draftContentByAtomId[atomId] ?? _selectedNote?.content ?? '';
       _refreshSaveStateForActive();
       _requestEditorFocus();
+      _syncWorkspaceFromControllerState();
       notifyListeners();
       await _loadSelectedDetail(atomId: atomId);
       return true;
     }
+    _syncWorkspaceFromControllerState();
     notifyListeners();
     return true;
   }
@@ -1187,6 +1232,7 @@ class NotesController extends ChangeNotifier {
       _autosaveTimer?.cancel();
       _setSaveState(NoteSaveState.clean);
     }
+    _syncWorkspaceActiveSnapshot();
     notifyListeners();
   }
 
@@ -1311,6 +1357,7 @@ class NotesController extends ChangeNotifier {
         _activeDraftContent = '';
         _setSaveState(NoteSaveState.clean);
       }
+      _syncWorkspaceFromControllerState();
       notifyListeners();
 
       if (detailTargetId != null) {
@@ -1351,6 +1398,7 @@ class NotesController extends ChangeNotifier {
     _noteSaveState = NoteSaveState.clean;
     _saveErrorMessage = null;
     _showSavedBadge = false;
+    _syncWorkspaceFromControllerState();
   }
 
   Future<void> _refreshAvailableTags({bool showLoading = true}) async {
@@ -1460,6 +1508,7 @@ class NotesController extends ChangeNotifier {
         _detailLoading = false;
         _detailErrorMessage = null;
         _refreshSaveStateForActive();
+        _syncWorkspaceActiveSnapshot();
         notifyListeners();
         return;
       }
@@ -1671,6 +1720,7 @@ class NotesController extends ChangeNotifier {
         } else {
           _setSaveState(NoteSaveState.clean, showSavedBadge: true);
         }
+        _syncWorkspaceActiveSnapshot();
         notifyListeners();
       }
       return true;
@@ -1712,6 +1762,12 @@ class NotesController extends ChangeNotifier {
     bool showSavedBadge = false,
   }) {
     _noteSaveState = nextState;
+    if (_activeNoteId case final activeId?) {
+      _workspaceProvider.syncSaveState(
+        noteId: activeId,
+        saveState: _mapSaveStateToWorkspace(nextState),
+      );
+    }
     if (!preserveError) {
       _saveErrorMessage = null;
     }
@@ -1729,6 +1785,89 @@ class NotesController extends ChangeNotifier {
     }
     _savedBadgeTimer?.cancel();
     _showSavedBadge = false;
+  }
+
+  WorkspaceSaveState _mapSaveStateToWorkspace(NoteSaveState state) {
+    switch (state) {
+      case NoteSaveState.clean:
+        return WorkspaceSaveState.clean;
+      case NoteSaveState.dirty:
+        return WorkspaceSaveState.dirty;
+      case NoteSaveState.saving:
+        return WorkspaceSaveState.saving;
+      case NoteSaveState.error:
+        return WorkspaceSaveState.saveError;
+    }
+  }
+
+  WorkspaceSaveState _workspaceSaveStateForNote(String atomId) {
+    if (_activeNoteId == atomId) {
+      return _mapSaveStateToWorkspace(_noteSaveState);
+    }
+    return _isDirty(atomId)
+        ? WorkspaceSaveState.dirty
+        : WorkspaceSaveState.clean;
+  }
+
+  String _workspacePersistedContentFor(String atomId) {
+    final persisted = _persistedContentByAtomId[atomId];
+    if (persisted != null) {
+      return persisted;
+    }
+    final cached = _noteCache[atomId];
+    if (cached != null) {
+      return cached.content;
+    }
+    if (_selectedNote?.atomId == atomId) {
+      return _selectedNote?.content ?? '';
+    }
+    return '';
+  }
+
+  String _workspaceDraftContentFor(String atomId) {
+    return _draftContentByAtomId[atomId] ??
+        _workspacePersistedContentFor(atomId);
+  }
+
+  void _syncWorkspaceActiveSnapshot() {
+    final activeId = _activeNoteId;
+    if (activeId == null) {
+      return;
+    }
+    _workspaceProvider.syncExternalNote(
+      noteId: activeId,
+      persistedContent: _workspacePersistedContentFor(activeId),
+      draftContent: _workspaceDraftContentFor(activeId),
+      saveState: _workspaceSaveStateForNote(activeId),
+      activate: true,
+    );
+  }
+
+  void _syncWorkspaceFromControllerState() {
+    _workspaceProvider.resetAll();
+    if (_openNoteIds.isEmpty) {
+      return;
+    }
+    for (final atomId in _openNoteIds) {
+      _workspaceProvider.syncExternalNote(
+        noteId: atomId,
+        persistedContent: _workspacePersistedContentFor(atomId),
+        draftContent: _workspaceDraftContentFor(atomId),
+        saveState: _workspaceSaveStateForNote(atomId),
+        activate: _activeNoteId == atomId,
+      );
+    }
+    if (_activeNoteId case final activeId?) {
+      if (!_openNoteIds.contains(activeId)) {
+        _workspaceProvider.syncExternalNote(
+          noteId: activeId,
+          persistedContent: _workspacePersistedContentFor(activeId),
+          draftContent: _workspaceDraftContentFor(activeId),
+          saveState: _workspaceSaveStateForNote(activeId),
+          activate: true,
+        );
+      }
+    }
   }
 
   String _envelopeError({

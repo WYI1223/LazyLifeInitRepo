@@ -24,6 +24,7 @@ class WorkspaceProvider extends ChangeNotifier {
     WorkspaceDebounceTimerFactory? debounceTimerFactory,
     this.autosaveDebounce = const Duration(milliseconds: 800),
     this.flushMaxRetries = 5,
+    this.autosaveEnabled = true,
   }) : _saveInvoker = saveInvoker ?? _defaultSaveInvoker,
        _tagMutationInvoker = tagMutationInvoker ?? _defaultTagMutationInvoker,
        _debounceTimerFactory = debounceTimerFactory ?? Timer.new {
@@ -42,6 +43,9 @@ class WorkspaceProvider extends ChangeNotifier {
 
   /// Maximum flush retry attempts for one request.
   final int flushMaxRetries;
+
+  /// Whether draft updates should schedule internal autosave.
+  final bool autosaveEnabled;
 
   final WorkspaceLayoutState _layoutState = WorkspaceLayoutState.singlePane();
   String _activePaneId = '';
@@ -178,7 +182,77 @@ class WorkspaceProvider extends ChangeNotifier {
       version: current.version + 1,
     );
     _saveStateByNoteId[noteId] = WorkspaceSaveState.dirty;
-    _scheduleAutosave(noteId);
+    if (autosaveEnabled) {
+      _scheduleAutosave(noteId);
+    }
+    notifyListeners();
+  }
+
+  /// Sync one note snapshot from external owner (e.g. NotesController).
+  void syncExternalNote({
+    required String noteId,
+    required String persistedContent,
+    required String draftContent,
+    WorkspaceSaveState? saveState,
+    bool activate = false,
+    String? paneId,
+  }) {
+    final targetPaneId = paneId ?? _activePaneId;
+    final tabs = _openTabsByPane.putIfAbsent(targetPaneId, () => <String>[]);
+    if (!tabs.contains(noteId)) {
+      tabs.add(noteId);
+    }
+    if (activate) {
+      _activePaneId = targetPaneId;
+      _activeTabByPane[targetPaneId] = noteId;
+    } else {
+      _activeTabByPane.putIfAbsent(targetPaneId, () => null);
+    }
+
+    final previous = _buffersByNoteId[noteId];
+    _buffersByNoteId[noteId] = WorkspaceNoteBuffer(
+      noteId: noteId,
+      persistedContent: persistedContent,
+      draftContent: draftContent,
+      version: previous?.version ?? 0,
+    );
+    _saveStateByNoteId[noteId] =
+        saveState ??
+        (draftContent == persistedContent
+            ? WorkspaceSaveState.clean
+            : WorkspaceSaveState.dirty);
+    notifyListeners();
+  }
+
+  /// Sync save-state only for existing note buffer.
+  void syncSaveState({
+    required String noteId,
+    required WorkspaceSaveState saveState,
+  }) {
+    if (!_buffersByNoteId.containsKey(noteId)) {
+      return;
+    }
+    _saveStateByNoteId[noteId] = saveState;
+    notifyListeners();
+  }
+
+  /// Clears pane/tab/buffer/save state.
+  void resetAll() {
+    for (final timer in _saveDebounceByNoteId.values) {
+      timer.cancel();
+    }
+    _saveDebounceByNoteId.clear();
+    _saveInFlightByNoteId.clear();
+    _tagMutationQueueByNoteId.clear();
+    _openTabsByPane
+      ..clear()
+      ..[_layoutState.primaryPaneId] = <String>[];
+    _activeTabByPane
+      ..clear()
+      ..[_layoutState.primaryPaneId] = null;
+    _buffersByNoteId.clear();
+    _saveStateByNoteId.clear();
+    _activePaneId = _layoutState.primaryPaneId;
     notifyListeners();
   }
 
