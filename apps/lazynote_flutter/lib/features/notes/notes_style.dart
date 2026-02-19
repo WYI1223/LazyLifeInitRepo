@@ -6,8 +6,26 @@ import 'package:flutter/material.dart';
 /// so Notes keeps a consistent minimalist surface in Workbench.
 const Color kNotesSidebarBackground = Color(0xFFF7F7F5);
 
+/// Unified Notes shell radius aligned with v0.2 card language.
+const double kNotesShellRadius = 20;
+
+/// Inset divider indentation used by split panes.
+const double kNotesShellDividerIndent = 12;
+
+/// Outer spacing between Notes header and shell card.
+const double kNotesShellTopGap = 12;
+
+/// Shadow blur for Notes shell card.
+const double kNotesShellShadowBlur = 24;
+
+/// Shadow offset for Notes shell card.
+const Offset kNotesShellShadowOffset = Offset(0, 8);
+
+/// Shadow opacity for Notes shell card.
+const double kNotesShellShadowOpacity = 0.05;
+
 /// Shared height for explorer header row and top tab strip.
-const double kNotesTopStripHeight = 26;
+const double kNotesTopStripHeight = 40;
 
 /// Main document canvas background color.
 const Color kNotesCanvasBackground = Color(0xFFFFFFFF);
@@ -35,3 +53,19 @@ const Color kNotesErrorBackground = Color(0xFFFFEBEE);
 
 /// Error surface border color for inline detail failures.
 const Color kNotesErrorBorder = Color(0xFFFFCDD2);
+
+/// Resolves Notes shell card background from current theme.
+Color notesShellBackground(BuildContext context) =>
+    Theme.of(context).colorScheme.surfaceContainer;
+
+/// Resolves Notes shell headline text color from current theme.
+Color notesHeaderTextColor(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurface;
+
+/// Resolves Notes secondary text color from current theme.
+Color notesSecondaryTextColor(BuildContext context) =>
+    Theme.of(context).colorScheme.onSurfaceVariant;
+
+/// Resolves Notes split divider color from current theme.
+Color notesDividerColor(BuildContext context) =>
+    Theme.of(context).colorScheme.outlineVariant;

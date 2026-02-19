@@ -100,100 +100,52 @@ class _NoteExplorerState extends State<NoteExplorer> {
           SizedBox(
             height: kNotesTopStripHeight,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 8, 0),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 235;
-                  final reloadDisabled =
-                      widget.controller.creatingNote ||
-                      widget.controller.createTagApplyInFlight;
-                  return Row(
-                    children: [
-                      const Icon(
-                        Icons.account_tree_outlined,
-                        size: 14,
-                        color: kNotesSecondaryText,
+              padding: const EdgeInsets.fromLTRB(14, 0, 10, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'My Workspace',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: kNotesPrimaryText,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Explorer',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: kNotesPrimaryText,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                      ),
-                      if (!compact) ...[
-                        const SizedBox(width: 4),
-                        Text(
-                          '${widget.controller.items.length}',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: kNotesSecondaryText),
-                        ),
-                      ],
-                      IconButton(
-                        key: const Key('notes_create_button'),
-                        tooltip: 'Create note',
-                        onPressed: widget.controller.creatingNote
-                            ? null
-                            : widget.onCreateNoteRequested,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 22,
-                          height: 22,
-                        ),
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                        icon: widget.controller.creatingNote
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 1.6,
-                                  color: kNotesSecondaryText,
-                                ),
-                              )
-                            : const Icon(
-                                Icons.add,
-                                size: 14,
-                                color: kNotesSecondaryText,
-                              ),
-                      ),
-                      IconButton(
-                        tooltip: 'Retry',
-                        onPressed: reloadDisabled
-                            ? null
-                            : widget.controller.retryLoad,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 22,
-                          height: 22,
-                        ),
-                        padding: EdgeInsets.zero,
-                        visualDensity: VisualDensity.compact,
-                        icon: const Icon(
-                          Icons.refresh,
-                          size: 14,
-                          color: kNotesSecondaryText,
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Reload',
+                    onPressed:
+                        widget.controller.creatingNote ||
+                            widget.controller.createTagApplyInFlight
+                        ? null
+                        : widget.controller.retryLoad,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 26,
+                      height: 26,
+                    ),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(
+                      Icons.refresh,
+                      size: 15,
+                      color: kNotesSecondaryText,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
           const Divider(
             height: 1,
-            indent: 12,
-            endIndent: 12,
+            indent: 10,
+            endIndent: 10,
             color: kNotesDividerColor,
           ),
           if (widget.controller.createErrorMessage case final createError?)
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
               child: Text(
                 createError,
                 key: const Key('notes_create_error'),
@@ -205,28 +157,36 @@ class _NoteExplorerState extends State<NoteExplorer> {
                 ),
               ),
             ),
-          TagFilter(
-            loading: widget.controller.tagsLoading,
-            tags: widget.controller.availableTags,
-            selectedTag: widget.controller.selectedTag,
-            errorMessage: widget.controller.tagsErrorMessage,
-            onSelectTag: (tag) {
-              unawaited(widget.controller.applyTagFilter(tag));
-            },
-            onClearTag: () {
-              unawaited(widget.controller.clearTagFilter());
-            },
-            onRetry: () {
-              unawaited(widget.controller.retryTagLoad());
-            },
-          ),
-          const Divider(
-            height: 1,
-            indent: 12,
-            endIndent: 12,
-            color: kNotesDividerColor,
-          ),
           Expanded(child: _buildBody(context)),
+          const Divider(height: 1, color: kNotesDividerColor),
+          SizedBox(
+            height: 42,
+            child: TextButton.icon(
+              key: const Key('notes_create_button'),
+              onPressed: widget.controller.creatingNote
+                  ? null
+                  : widget.onCreateNoteRequested,
+              icon: widget.controller.creatingNote
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.8,
+                        color: kNotesSecondaryText,
+                      ),
+                    )
+                  : const Icon(Icons.add, size: 16),
+              label: const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('New Page'),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: kNotesSecondaryText,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.centerLeft,
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -290,6 +250,26 @@ class _NoteExplorerState extends State<NoteExplorer> {
       case NotesListPhase.success:
         final tree = _buildFolderTree();
         final rows = <Widget>[];
+        rows.add(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+            child: TagFilter(
+              loading: widget.controller.tagsLoading,
+              tags: widget.controller.availableTags,
+              selectedTag: widget.controller.selectedTag,
+              errorMessage: widget.controller.tagsErrorMessage,
+              onSelectTag: (tag) {
+                unawaited(widget.controller.applyTagFilter(tag));
+              },
+              onClearTag: () {
+                unawaited(widget.controller.clearTagFilter());
+              },
+              onRetry: () {
+                unawaited(widget.controller.retryTagLoad());
+              },
+            ),
+          ),
+        );
         for (final node in tree) {
           _appendFolderRows(context, rows: rows, node: node, depth: 0);
         }
@@ -318,22 +298,18 @@ class _NoteExplorerState extends State<NoteExplorer> {
     if (widget.folderTreeBuilder case final builder?) {
       return builder(widget.controller);
     }
-    // v0.1 one-level structure while keeping recursive model for future folders.
+    // v0.2A visual baseline: show workspace-like top folders while still
+    // binding note rows from existing list source.
     final noteIds = widget.controller.items.map((item) => item.atomId).toList();
     return <ExplorerFolderNode>[
+      ExplorerFolderNode(id: 'projects', label: 'Projects', deletable: false),
       ExplorerFolderNode(
-        id: 'private',
-        label: 'Private',
+        id: 'notes',
+        label: 'Notes',
         deletable: false,
-        children: <ExplorerFolderNode>[
-          ExplorerFolderNode(
-            id: 'private/all',
-            label: 'All Notes',
-            noteIds: noteIds,
-            deletable: false,
-          ),
-        ],
+        noteIds: noteIds,
       ),
+      ExplorerFolderNode(id: 'personal', label: 'Personal', deletable: false),
     ];
   }
 
@@ -349,23 +325,25 @@ class _NoteExplorerState extends State<NoteExplorer> {
         _looksLikeUuid(node.id);
     rows.add(
       Padding(
-        padding: EdgeInsets.fromLTRB(10 + depth * 12, 6, 10, 2),
+        padding: EdgeInsets.fromLTRB(12 + depth * 12, 8, 10, 2),
         child: Row(
           children: [
-            Icon(
-              depth == 0 ? Icons.bookmark_border : Icons.folder_outlined,
+            const Icon(
+              Icons.chevron_right,
               size: 14,
               color: kNotesSecondaryText,
             ),
+            const SizedBox(width: 2),
+            Icon(Icons.folder_outlined, size: 16, color: kNotesSecondaryText),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
                 node.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: kNotesSecondaryText,
-                  fontWeight: depth == 0 ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
@@ -589,13 +567,13 @@ class _ExplorerNoteRow extends StatelessWidget {
           hoverColor: kNotesItemHoverColor,
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
+            padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(
                   kNotesItemPlaceholderIcon,
-                  size: 34,
+                  size: 16,
                   color: kNotesSecondaryText,
                 ),
                 const SizedBox(width: 6),
@@ -611,7 +589,7 @@ class _ExplorerNoteRow extends StatelessWidget {
                           color: kNotesPrimaryText,
                           fontWeight: selected
                               ? FontWeight.w700
-                              : FontWeight.w600,
+                              : FontWeight.w500,
                         ),
                       ),
                       const SizedBox(height: 2),

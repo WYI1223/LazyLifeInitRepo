@@ -107,7 +107,7 @@ class NoteContentArea extends StatelessWidget {
         // Why: keep readable document line length on wide desktop windows.
         constraints: const BoxConstraints(maxWidth: 860),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(26, 20, 26, 28),
+          padding: const EdgeInsets.fromLTRB(34, 18, 34, 28),
           child: Column(
             key: const Key('notes_detail_editor'),
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -118,14 +118,27 @@ class NoteContentArea extends StatelessWidget {
                   // collapsing secondary actions into one overflow menu.
                   final compactActions = constraints.maxWidth < 520;
                   return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: Text(
-                          'Vibe Coding for LazyLife > Private',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: kNotesSecondaryText),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.sentiment_satisfied_alt,
+                              size: 14,
+                              color: kNotesSecondaryText,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'Omni-Bar / Private',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(color: kNotesSecondaryText),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -203,30 +216,54 @@ class NoteContentArea extends StatelessWidget {
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
-                children: [
-                  _MetaChip(label: 'Add icon', onPressed: () {}),
-                  _MetaChip(label: 'Add cover', onPressed: () {}),
-                  _MetaChip(label: 'Add comment', onPressed: () {}),
+                children: const [
+                  _MetaChip(
+                    chipKey: Key('notes_detail_add_icon_button'),
+                    label: 'Add icon',
+                  ),
+                  _MetaChip(
+                    chipKey: Key('notes_detail_add_image_button'),
+                    label: 'Add image',
+                  ),
+                  _MetaChip(
+                    chipKey: Key('notes_detail_add_comment_button'),
+                    label: 'Add comment',
+                  ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Text(
-                controller.titleForTab(note.atomId),
-                key: const Key('notes_detail_title'),
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  color: kNotesPrimaryText,
-                  fontWeight: FontWeight.w700,
-                  height: 1.15,
-                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(
+                    kNotesItemPlaceholderIcon,
+                    key: Key('notes_detail_title_icon_placeholder'),
+                    size: 30,
+                    color: kNotesSecondaryText,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      controller.titleForTab(note.atomId),
+                      key: const Key('notes_detail_title'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                        color: kNotesPrimaryText,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Text(
                 'Updated ${_formatAbsoluteTime(note.updatedAt)}',
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: kNotesSecondaryText),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               _NoteTagsSection(
                 tags: note.tags,
                 onAddTag: (tag) {
@@ -236,13 +273,20 @@ class NoteContentArea extends StatelessWidget {
                   unawaited(controller.removeTagFromActiveNote(tag));
                 },
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               Expanded(
-                child: NoteEditor(
-                  key: ValueKey<String>('note_editor_$atomId'),
-                  content: activeDraftContent,
-                  focusRequestId: controller.editorFocusRequestId,
-                  onChanged: controller.updateActiveDraft,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    color: kNotesCanvasBackground,
+                  ),
+                  padding: const EdgeInsets.fromLTRB(0, 0, 0, 6),
+                  child: NoteEditor(
+                    key: ValueKey<String>('note_editor_$atomId'),
+                    content: activeDraftContent,
+                    focusRequestId: controller.editorFocusRequestId,
+                    onChanged: controller.updateActiveDraft,
+                  ),
                 ),
               ),
             ],
@@ -528,6 +572,28 @@ class _MoreActionsMenuButton extends StatelessWidget {
   }
 }
 
+class _MetaChip extends StatelessWidget {
+  const _MetaChip({required this.chipKey, required this.label});
+
+  final Key chipKey;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      key: chipKey,
+      onPressed: () {},
+      style: TextButton.styleFrom(
+        foregroundColor: kNotesSecondaryText,
+        backgroundColor: kNotesItemHoverColor,
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      ),
+      child: Text(label),
+    );
+  }
+}
+
 class _NoteTagsSection extends StatelessWidget {
   const _NoteTagsSection({
     required this.tags,
@@ -560,7 +626,7 @@ class _NoteTagsSection extends StatelessWidget {
             side: BorderSide.none,
             labelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: kNotesPrimaryText,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w500,
             ),
           ),
         TextButton.icon(
@@ -581,27 +647,6 @@ class _NoteTagsSection extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label, required this.onPressed});
-
-  final String label;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: onPressed,
-      style: TextButton.styleFrom(
-        foregroundColor: kNotesSecondaryText,
-        backgroundColor: kNotesItemHoverColor,
-        visualDensity: VisualDensity.compact,
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      ),
-      child: Text(label),
     );
   }
 }

@@ -75,15 +75,8 @@ class _NoteTabManagerState extends State<NoteTabManager> {
         color: kNotesCanvasBackground,
         child: SizedBox(
           key: const Key('note_tab_manager'),
-          height: kNotesTopStripHeight + 1,
-          child: Column(
-            children: [
-              SizedBox(
-                height: kNotesTopStripHeight,
-                child: _buildTabStrip(context),
-              ),
-            ],
-          ),
+          height: kNotesTopStripHeight,
+          child: _buildTabStrip(context),
         ),
       ),
     );
@@ -113,12 +106,9 @@ class _NoteTabManagerState extends State<NoteTabManager> {
             child: ListView.separated(
               controller: _scrollController,
               scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.fromLTRB(10, 5, 10, 5),
               itemCount: openNoteIds.length,
-              separatorBuilder: (_, _) => const SizedBox(
-                width: 1,
-                child: ColoredBox(color: kNotesDividerColor),
-              ),
+              separatorBuilder: (_, _) => const SizedBox(width: 6),
               itemBuilder: (context, index) {
                 final noteId = openNoteIds[index];
                 final active = noteId == activeNoteId;
@@ -151,6 +141,9 @@ class _NoteTabManagerState extends State<NoteTabManager> {
     final title = widget.controller.titleForTab(noteId);
     final background = active ? Colors.transparent : kNotesSidebarBackground;
     final foreground = active ? kNotesPrimaryText : kNotesSecondaryText;
+    final side = active
+        ? BorderSide.none
+        : const BorderSide(color: kNotesDividerColor);
 
     return GestureDetector(
       onSecondaryTapDown: (details) async {
@@ -177,9 +170,15 @@ class _NoteTabManagerState extends State<NoteTabManager> {
         await _handleTabContextAction(noteId: noteId, action: action);
       },
       child: Material(
+        key: Key('note_tab_shell_$noteId'),
         color: background,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: side,
+        ),
         child: InkWell(
           key: Key('note_tab_$noteId'),
+          borderRadius: BorderRadius.circular(8),
           splashFactory: NoSplash.splashFactory,
           highlightColor: Colors.transparent,
           hoverColor: kNotesItemHoverColor,
@@ -187,14 +186,14 @@ class _NoteTabManagerState extends State<NoteTabManager> {
             widget.controller.activateOpenNote(noteId);
           },
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minWidth: 88, maxWidth: 210),
+            constraints: const BoxConstraints(minWidth: 96, maxWidth: 220),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 2, 4, 2),
+              padding: const EdgeInsets.fromLTRB(10, 4, 6, 4),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(kNotesItemPlaceholderIcon, size: 12, color: foreground),
-                  const SizedBox(width: 4),
+                  Icon(kNotesItemPlaceholderIcon, size: 13, color: foreground),
+                  const SizedBox(width: 5),
                   Flexible(
                     child: Text(
                       title,
@@ -202,11 +201,11 @@ class _NoteTabManagerState extends State<NoteTabManager> {
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: foreground,
-                        fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                        fontWeight: active ? FontWeight.w600 : FontWeight.w500,
                       ),
                     ),
                   ),
-                  const SizedBox(width: 2),
+                  const SizedBox(width: 3),
                   InkWell(
                     key: Key('note_tab_close_$noteId'),
                     splashFactory: NoSplash.splashFactory,
@@ -216,7 +215,7 @@ class _NoteTabManagerState extends State<NoteTabManager> {
                     },
                     child: Padding(
                       padding: const EdgeInsets.all(2),
-                      child: Icon(Icons.close, size: 12, color: foreground),
+                      child: Icon(Icons.close, size: 13, color: foreground),
                     ),
                   ),
                 ],
