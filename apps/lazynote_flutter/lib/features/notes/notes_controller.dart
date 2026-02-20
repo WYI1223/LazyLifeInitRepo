@@ -480,12 +480,6 @@ class NotesController extends ChangeNotifier {
   /// Handles open-note request from explorer shell.
   Future<bool> openNoteFromExplorer(String atomId) => selectNote(atomId);
 
-  /// Handles explicit pinned-open request from explorer double-click.
-  ///
-  /// Current v0.2 tab model does not distinguish preview vs pinned. This
-  /// method still uses [selectNote] and reserves semantic split for v0.3.
-  Future<bool> openNoteFromExplorerPinned(String atomId) => selectNote(atomId);
-
   /// Creates one workspace folder under root or one parent folder.
   Future<rust_api.WorkspaceNodeResponse> createWorkspaceFolder({
     required String name,

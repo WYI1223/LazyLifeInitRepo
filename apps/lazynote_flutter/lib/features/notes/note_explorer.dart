@@ -59,7 +59,6 @@ class NoteExplorer extends StatefulWidget {
     super.key,
     required this.controller,
     required this.onOpenNoteRequested,
-    this.onOpenNotePinnedRequested,
     required this.onCreateNoteRequested,
     this.onCreateFolderRequested,
     this.onDeleteFolderRequested,
@@ -72,9 +71,6 @@ class NoteExplorer extends StatefulWidget {
 
   /// Callback emitted when user requests opening one note.
   final ValueChanged<String> onOpenNoteRequested;
-
-  /// Callback emitted when user explicitly requests pinned-open (double click).
-  final ValueChanged<String>? onOpenNotePinnedRequested;
 
   /// Callback emitted when user requests creating one note.
   final Future<void> Function() onCreateNoteRequested;
@@ -672,9 +668,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
           depth: depth + 1,
           selected: noteId == widget.controller.activeNoteId,
           onTap: () => widget.onOpenNoteRequested(noteId),
-          onDoubleTap: widget.onOpenNotePinnedRequested == null
-              ? null
-              : () => widget.onOpenNotePinnedRequested!(noteId),
           previewText: _previewText(noteId: noteId, note: note),
         ),
       );
@@ -825,9 +818,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
           selected: noteId == widget.controller.activeNoteId,
           depth: depth + 1,
           onTap: () => widget.onOpenNoteRequested(noteId),
-          onDoubleTap: widget.onOpenNotePinnedRequested == null
-              ? null
-              : () => widget.onOpenNotePinnedRequested!(noteId),
           previewText: _previewText(noteId: noteId, note: item),
         ),
       );

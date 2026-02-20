@@ -187,12 +187,15 @@ Recommended order:
    - [x] add root/child folder create entry and tree refresh hook (UUID parent guarded)
    - [x] keep user expand/collapse state stable across create/delete refresh (no forced `Uncategorized` re-expand)
    - [x] inject default root `Uncategorized` folder (backward-compatible root note visibility kept)
-   - [x] keep single/double click callback intents stable; preview/pinned semantic ownership is deferred to `PR-0304` tab model
+   - [x] keep explorer open callback as single intent only; preview/pinned semantic ownership is deferred to `PR-0205B` -> `PR-0304` tab model
    - [x] add explorer tree regression tests (`test/note_explorer_tree_test.dart`)
-6. `PR-0205B` transition planning baseline
-   - [x] define explorer intent vs tab semantic ownership boundary
-   - [x] define execution milestones and exit criteria (M1-M4)
-   - [x] define `PR-0206` start gate: begin after `PR-0205B` interaction freeze
+6. `PR-0205B` explorer/tab semantic transition
+   - [x] M1 contract freeze: explorer runtime API emits single open intent only
+   - [x] remove explorer-side pinned/double-click runtime branch and controller shim
+   - [x] sync `PR-0205` + `PR-0205B` wording to avoid ownership drift
+   - [ ] M2 tab-model semantic landing (single/double policy in tab lane)
+   - [x] `PR-0206` start gate satisfied (`M1` interaction freeze completed)
+   - [ ] M3/M4 cleanup + closure
 
 ## Quality Gates
 

@@ -29,7 +29,7 @@ In scope:
 
 - recursive folder rendering
 - lazy load children on expand
-- single-click emits preview-open intent callback
+- single-click emits open-note intent callback
 - folder row action: create child folder (UUID parent only)
 - hover-first minimalist explorer actions
 - explorer-level loading/error/empty states for lazy children
@@ -72,7 +72,7 @@ Out of scope:
 1. Expand folder:
    - request children only when expanded first time
 2. Single click note:
-   - emit preview-open intent callback
+   - emit open-note intent callback
 3. Create child folder:
    - folder row action opens create dialog and passes current folder id as parent
 

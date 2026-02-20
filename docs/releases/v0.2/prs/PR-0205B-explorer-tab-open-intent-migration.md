@@ -1,7 +1,7 @@
 # PR-0205B-explorer-tab-open-intent-migration
 
 - Proposed title: `refactor(notes-tab): move preview/pinned semantics ownership from explorer to tab model`
-- Status: Planned
+- Status: In Progress (M1 completed, M2-M4 pending)
 
 ## Goal
 
@@ -68,6 +68,13 @@ Exit criteria:
 - docs explicitly state explorer != semantic owner
 - no runtime dependency on explorer double-click path
 
+M1 implementation note:
+
+- removed explorer-level pinned callback path from `NoteExplorer` runtime
+  contract (single open intent only).
+- removed explorer-side double-click pinned shim from `NotesController`.
+- updated explorer widget tests to assert single open intent contract.
+
 ### M2. Tab model behavior landing
 
 Deliverables:
@@ -113,9 +120,12 @@ Exit criteria:
 
 ## Planned File Changes
 
+- [edit] `apps/lazynote_flutter/lib/features/notes/note_explorer.dart`
+- [edit] `apps/lazynote_flutter/lib/features/notes/explorer_tree_item.dart`
 - [edit] `apps/lazynote_flutter/lib/features/notes/notes_page.dart`
 - [edit] `apps/lazynote_flutter/lib/features/notes/note_tab_manager.dart`
 - [edit] `apps/lazynote_flutter/lib/features/notes/notes_controller.dart`
+- [edit] `apps/lazynote_flutter/test/note_explorer_tree_test.dart`
 - [edit] `docs/releases/v0.2/prs/PR-0205-explorer-recursive-lazy-ui.md`
 - [edit] `docs/releases/v0.3/prs/PR-0304-tab-preview-pinned-model.md`
 - [edit] `docs/api/ffi-contracts.md`
@@ -130,7 +140,7 @@ Exit criteria:
 
 ## Acceptance Criteria
 
-- [ ] Explorer no longer carries runtime semantic ownership for preview/pinned.
+- [x] Explorer no longer carries runtime semantic ownership for preview/pinned.
 - [ ] Top tab model owns single/double click semantic decisions.
-- [ ] Contract docs explicitly reflect ownership boundary and no longer drift.
+- [x] Contract docs explicitly reflect ownership boundary and no longer drift.
 - [ ] `PR-0206` can start without reopening explorer/tab semantic boundary decisions.

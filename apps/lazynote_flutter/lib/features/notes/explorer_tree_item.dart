@@ -15,8 +15,7 @@ class ExplorerTreeItem extends StatelessWidget {
     required this.canDelete,
     this.onCreateChildFolder,
     this.onDeleteFolder,
-  }) : previewText = null,
-       onDoubleTap = null;
+  }) : previewText = null;
 
   const ExplorerTreeItem.note({
     super.key,
@@ -24,7 +23,6 @@ class ExplorerTreeItem extends StatelessWidget {
     required this.depth,
     required this.selected,
     required this.onTap,
-    required this.onDoubleTap,
     required this.previewText,
   }) : expanded = false,
        canCreateChild = false,
@@ -40,7 +38,6 @@ class ExplorerTreeItem extends StatelessWidget {
   final bool canDelete;
   final String? previewText;
   final VoidCallback onTap;
-  final VoidCallback? onDoubleTap;
   final VoidCallback? onCreateChildFolder;
   final VoidCallback? onDeleteFolder;
 
@@ -141,7 +138,6 @@ class ExplorerTreeItem extends StatelessWidget {
           highlightColor: Colors.transparent,
           hoverColor: kNotesItemHoverColor,
           onTap: onTap,
-          onDoubleTap: onDoubleTap,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
             child: Row(
