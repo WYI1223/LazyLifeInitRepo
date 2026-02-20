@@ -98,7 +98,9 @@ M2 implementation note:
 - `NoteTabManager` now owns tab-level single/double interaction semantics:
   single tap activates tab, rapid second tap pins preview tab.
 - `NoteExplorer` supports explicit double-click pinned-open shortcut by
-  dispatching pinned intent callback to controller (`open + pin`).
+  dispatching pinned intent callback to controller.
+  - second click default path is pin-only (no duplicate open dispatch)
+  - `open + pin` is only used when target is not opened yet
 - added/updated regression tests:
   - `test/notes_controller_tabs_test.dart`
   - `test/tab_open_intent_migration_test.dart`

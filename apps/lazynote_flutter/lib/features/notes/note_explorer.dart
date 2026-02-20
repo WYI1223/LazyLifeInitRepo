@@ -537,10 +537,11 @@ class _NoteExplorerState extends State<NoteExplorer> {
         lastAt != null &&
         now.difference(lastAt) <= _doubleTapThreshold;
 
-    widget.onOpenNoteRequested(noteId);
     if (isSecondTap) {
       widget.onOpenNotePinnedRequested!(noteId);
+      return;
     }
+    widget.onOpenNoteRequested(noteId);
   }
 
   void _appendWorkspaceRows(

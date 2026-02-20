@@ -58,6 +58,8 @@ Out of scope:
   - single click: `onOpenNoteRequested(atomId)`
   - optional double click: `onOpenNotePinnedRequested(atomId)` as explicit
     pinned-open shortcut
+    - default second-click behavior: pin only (do not repeat open)
+    - only when target is not opened yet, controller may apply `open + pin`
   - folder create: `onCreateFolderRequested(name, parentNodeId?)`
     - `parentNodeId = null` for root create
     - non-null parent id must satisfy UUID format
@@ -75,6 +77,7 @@ Out of scope:
    - emit open-note intent callback
 3. Double click note (optional):
    - emit pinned-open intent callback
+   - second click after first open should pin only; avoid duplicate open dispatch
 4. Create child folder:
    - folder row action opens create dialog and passes current folder id as parent
 

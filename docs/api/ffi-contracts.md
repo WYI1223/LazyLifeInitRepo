@@ -108,7 +108,8 @@ This PR consumes existing workspace-tree APIs and does not change FFI shape.
 - UI callback semantics:
   - single click -> emit open-note intent callback
   - explorer optional double-click callback -> emit pinned-open intent callback
-    (open + pin shortcut)
+    (default second-click path is pin-only)
+  - `open + pin` is only used when target is not opened yet
   - explorer double-click remains source intent only; preview replacement and
     persist policy is tab-model owned
     (`docs/releases/v0.2/prs/PR-0205B-explorer-tab-open-intent-migration.md`)

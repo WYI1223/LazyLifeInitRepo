@@ -20,6 +20,8 @@ rust_api.NoteItem _note({
 
 NotesController _buildController({
   required Map<String, rust_api.NoteItem> store,
+  Future<rust_api.NoteResponse> Function({required String atomId})?
+  noteGetInvoker,
   Future<rust_api.WorkspaceActionResponse> Function({
     required String nodeId,
     required String mode,
@@ -49,15 +51,17 @@ NotesController _buildController({
         items: items,
       );
     },
-    noteGetInvoker: ({required atomId}) async {
-      final found = store[atomId];
-      return rust_api.NoteResponse(
-        ok: found != null,
-        errorCode: found == null ? 'note_not_found' : null,
-        message: found == null ? 'missing' : 'ok',
-        note: found,
-      );
-    },
+    noteGetInvoker:
+        noteGetInvoker ??
+        ({required atomId}) async {
+          final found = store[atomId];
+          return rust_api.NoteResponse(
+            ok: found != null,
+            errorCode: found == null ? 'note_not_found' : null,
+            message: found == null ? 'missing' : 'ok',
+            note: found,
+          );
+        },
     noteUpdateInvoker:
         noteUpdateInvoker ??
         ({required atomId, required content}) async {
@@ -156,6 +160,40 @@ void main() {
     expect(controller.previewTabId, isNull);
     expect(controller.isPreviewTab('note-2'), isFalse);
   });
+
+  test(
+    'explorer pinned-open on already active note does not duplicate note_get',
+    () async {
+      final store = <String, rust_api.NoteItem>{
+        'note-1': _note(atomId: 'note-1', content: '# first', updatedAt: 2),
+        'note-2': _note(atomId: 'note-2', content: '# second', updatedAt: 1),
+      };
+      final noteGetCalls = <String>[];
+      final controller = _buildController(
+        store: store,
+        noteGetInvoker: ({required atomId}) async {
+          noteGetCalls.add(atomId);
+          final found = store[atomId];
+          return rust_api.NoteResponse(
+            ok: found != null,
+            errorCode: found == null ? 'note_not_found' : null,
+            message: found == null ? 'missing' : 'ok',
+            note: found,
+          );
+        },
+      );
+      addTearDown(controller.dispose);
+
+      await controller.loadNotes();
+      noteGetCalls.clear();
+
+      await controller.openNoteFromExplorer('note-2');
+      expect(noteGetCalls, <String>['note-2']);
+
+      await controller.openNoteFromExplorerPinned('note-2');
+      expect(noteGetCalls, <String>['note-2']);
+    },
+  );
 
   test('explorer open replaces previous clean preview tab', () async {
     final store = <String, rust_api.NoteItem>{

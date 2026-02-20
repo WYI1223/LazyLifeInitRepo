@@ -674,6 +674,7 @@ void main() {
     await tester.tap(noteFinder);
     await tester.pumpAndSettle();
 
+    expect(opened, const <String>['note-1']);
     expect(pinned, const <String>['note-1']);
   });
 

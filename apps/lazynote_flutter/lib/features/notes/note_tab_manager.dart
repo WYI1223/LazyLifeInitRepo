@@ -80,6 +80,10 @@ class _NoteTabManagerState extends State<NoteTabManager> {
         lastAt != null &&
         now.difference(lastAt) <= _doubleTapThreshold) {
       widget.controller.pinPreviewTab(noteId);
+      if (widget.controller.activeNoteId != noteId) {
+        widget.controller.activateOpenNote(noteId);
+      }
+      return;
     }
     widget.controller.activateOpenNote(noteId);
   }

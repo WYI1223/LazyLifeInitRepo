@@ -527,6 +527,18 @@ class NotesController extends ChangeNotifier {
 
   /// Handles explicit pinned-open request from explorer double-click.
   Future<bool> openNoteFromExplorerPinned(String atomId) async {
+    if (_activeNoteId == atomId) {
+      pinPreviewTab(atomId);
+      return true;
+    }
+    if (_openNoteIds.contains(atomId)) {
+      final switched = await selectNote(atomId);
+      if (!switched) {
+        return false;
+      }
+      pinPreviewTab(atomId);
+      return true;
+    }
     final opened = await openNoteFromExplorer(atomId);
     if (!opened) {
       return false;

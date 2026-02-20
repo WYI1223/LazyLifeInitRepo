@@ -195,6 +195,7 @@ Recommended order:
    - [x] sync `PR-0205` + `PR-0205B` wording to avoid ownership drift
    - [x] M2 tab-model semantic landing (single tap activate + rapid second tap pin preview)
    - [x] support explorer note-row double-click as explicit pinned-open shortcut intent
+   - [x] explorer second-click default is pin-only (no duplicate open); `open + pin` only when target not opened
    - [x] preview replacement uses in-place tab swap (no transient append/remove jitter)
    - [x] add M2 regressions (`notes_controller_tabs_test.dart`, `tab_open_intent_migration_test.dart`)
    - [x] no regression in `notes_page_c1..c4`
