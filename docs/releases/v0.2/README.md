@@ -147,8 +147,8 @@ Recommended order:
    - `PR-0204-workspace-provider-foundation` (addresses R02-1.1/1.2/1.3 by design)
    - `PR-0205A-notes-ui-shell-alignment`
    - `PR-0205-explorer-recursive-lazy-ui` (M1 landed: recursive lazy tree + smoke tests)
-   - `PR-0205B-explorer-tab-open-intent-migration` (planned: move preview/pinned semantics to tab model lane)
-   - `PR-0206-split-layout-v1`
+   - `PR-0205B-explorer-tab-open-intent-migration` (planned: move preview/pinned semantics to tab model lane; freeze before split lane)
+   - `PR-0206-split-layout-v1` (start after PR-0205B contract/interaction freeze)
    - `PR-0207-explorer-context-actions-dnd-baseline`
 4. Support lane (parallel after shell baseline is stable):
    - `PR-0209-ui-localization-cn-en`
@@ -189,6 +189,10 @@ Recommended order:
    - [x] inject default root `Uncategorized` folder (backward-compatible root note visibility kept)
    - [x] keep single/double click callback intents stable; preview/pinned semantic ownership is deferred to `PR-0304` tab model
    - [x] add explorer tree regression tests (`test/note_explorer_tree_test.dart`)
+6. `PR-0205B` transition planning baseline
+   - [x] define explorer intent vs tab semantic ownership boundary
+   - [x] define execution milestones and exit criteria (M1-M4)
+   - [x] define `PR-0206` start gate: begin after `PR-0205B` interaction freeze
 
 ## Quality Gates
 

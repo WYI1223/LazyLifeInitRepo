@@ -51,6 +51,7 @@ rust_api.WorkspaceListChildrenResponse _ok(
 NotesController _controllerWithStore(
   Map<String, rust_api.NoteItem> store, {
   WorkspaceListChildrenInvoker? workspaceListChildrenInvoker,
+  WorkspaceCreateFolderInvoker? workspaceCreateFolderInvoker,
 }) {
   return NotesController(
     prepare: () async {},
@@ -72,6 +73,7 @@ NotesController _controllerWithStore(
       );
     },
     workspaceListChildrenInvoker: workspaceListChildrenInvoker,
+    workspaceCreateFolderInvoker: workspaceCreateFolderInvoker,
   );
 }
 
@@ -491,6 +493,100 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'create child folder stays visible when controller revision refresh path is used',
+    (WidgetTester tester) async {
+      final store = <String, rust_api.NoteItem>{
+        'note-1': _note(atomId: 'note-1', content: '# Note One', updatedAt: 1),
+      };
+      const parentId = '11111111-1111-4111-8111-111111111111';
+      var hasChild = false;
+      final controller = _controllerWithStore(
+        store,
+        workspaceListChildrenInvoker: ({parentNodeId}) async {
+          if (parentNodeId == null) {
+            return _ok(<rust_api.WorkspaceNodeItem>[
+              _node(
+                nodeId: parentId,
+                kind: 'folder',
+                displayName: 'Team',
+                sortOrder: 0,
+              ),
+            ]);
+          }
+          if (parentNodeId == parentId) {
+            return _ok(
+              hasChild
+                  ? <rust_api.WorkspaceNodeItem>[
+                      _node(
+                        nodeId: '22222222-2222-4222-8222-222222222222',
+                        kind: 'folder',
+                        parentNodeId: parentId,
+                        displayName: 'Child',
+                        sortOrder: 0,
+                      ),
+                    ]
+                  : const <rust_api.WorkspaceNodeItem>[],
+            );
+          }
+          return _ok(const <rust_api.WorkspaceNodeItem>[]);
+        },
+        workspaceCreateFolderInvoker: ({parentNodeId, required name}) async {
+          if (parentNodeId == parentId && name == 'Child') {
+            hasChild = true;
+          }
+          return const rust_api.WorkspaceNodeResponse(
+            ok: true,
+            errorCode: null,
+            message: 'ok',
+            node: null,
+          );
+        },
+      );
+      addTearDown(controller.dispose);
+      await controller.loadNotes();
+
+      await tester.pumpWidget(
+        _buildHarness(
+          controller: controller,
+          onOpen: (_) {},
+          onCreateFolderRequested: (name, parentNodeId) {
+            return controller.createWorkspaceFolder(
+              name: name,
+              parentNodeId: parentNodeId,
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(
+          const Key(
+            'notes_folder_create_button_11111111-1111-4111-8111-111111111111',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('notes_create_folder_name_input')),
+        'Child',
+      );
+      await tester.pump();
+      await tester.tap(
+        find.byKey(const Key('notes_create_folder_confirm_button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const Key('notes_tree_folder_22222222-2222-4222-8222-222222222222'),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets('single tap opens note immediately when pinned callback absent', (
     WidgetTester tester,

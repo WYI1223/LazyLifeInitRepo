@@ -200,9 +200,17 @@ class _NoteExplorerState extends State<NoteExplorer> {
     }
     final normalizedParent = refreshParentNodeId?.trim();
     if (normalizedParent != null && normalizedParent.isNotEmpty) {
-      await _treeState.ensureExpanded(normalizedParent);
-      await _treeState.retryParent(normalizedParent);
+      await _refreshParentBranch(normalizedParent);
     }
+  }
+
+  Future<void> _refreshParentBranch(String parentNodeId) async {
+    final normalizedParent = parentNodeId.trim();
+    if (normalizedParent.isEmpty) {
+      return;
+    }
+    await _treeState.ensureExpanded(normalizedParent);
+    await _treeState.retryParent(normalizedParent);
   }
 
   @override
@@ -916,8 +924,16 @@ class _NoteExplorerState extends State<NoteExplorer> {
       return;
     }
     if (response.ok) {
+      final normalizedParent = parentNodeId?.trim();
       if (widget.controller.workspaceTreeRevision == revisionBefore) {
-        await _reloadRootTree(force: true, refreshParentNodeId: parentNodeId);
+        await _reloadRootTree(
+          force: true,
+          refreshParentNodeId: normalizedParent,
+        );
+      } else if (normalizedParent != null && normalizedParent.isNotEmpty) {
+        // Revision refresh reloads root; child create still needs explicit parent
+        // branch refresh so new child folder appears immediately.
+        await _refreshParentBranch(normalizedParent);
       }
       messenger
         ?..hideCurrentSnackBar()

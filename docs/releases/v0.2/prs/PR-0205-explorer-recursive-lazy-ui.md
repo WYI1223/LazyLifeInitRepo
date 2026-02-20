@@ -108,6 +108,7 @@ Out of scope:
 - [x] Error/empty/loading states are visible and recoverable.
 - [x] Explorer states (default/hover/selected/loading/error) remain visually consistent with the shared UI style system.
 - [x] Create-folder refresh preserves user expand/collapse state and only refreshes affected parent branch.
+- [x] Child folder create is visible immediately even when controller revision-based refresh already fired.
 
 ## Implemented in current patch
 
@@ -125,6 +126,8 @@ Out of scope:
   refresh and to reload only the created folder's parent branch.
 - changed workspace tree exception handling to avoid silent fallback on all
   errors and preserve explicit error + retry UX for real backend faults.
+- fixed child-create immediate visibility under revision-refresh path by
+  explicitly refreshing the affected parent branch after successful create.
 - injected default root `Uncategorized` folder in tree responses while preserving
   legacy root note visibility for backward compatibility.
 - added regression tests in
