@@ -149,7 +149,7 @@ Recommended order:
    - `PR-0205A-notes-ui-shell-alignment`
    - `PR-0205-explorer-recursive-lazy-ui` (completed: recursive lazy tree + stability regressions)
    - `PR-0205B-explorer-tab-open-intent-migration` (completed: preview/pinned semantic ownership freeze)
-   - `PR-0206-split-layout-v1` (in review: post-review R1/R2/R3 remediation landed, awaiting QA)
+   - `PR-0206-split-layout-v1` (in review: post-review remediation landed; QA summary logged with accepted v0.2 limitations)
    - `PR-0207-explorer-context-actions-dnd-baseline`
 4. Support lane (parallel after shell baseline is stable):
    - `PR-0209-ui-localization-cn-en`
@@ -218,6 +218,7 @@ Recommended order:
    - [x] R3 fix: defensive copy and unmodifiable list wrapping in `WorkspaceLayoutState`
    - [x] R3 regression: input list mutation does not affect stored layout state
    - [x] re-run split verification bundle and update `PR-0206` status back to completed/in-review
+   - [x] QA summary logged: narrow-width split attempts blocked by `200px` guard and no unsplit action (accepted as v0.2 baseline limits)
 
 ## Quality Gates
 

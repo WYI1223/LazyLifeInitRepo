@@ -210,6 +210,28 @@ Regression tests:
 - `cd apps/lazynote_flutter && flutter test test/workspace_split_v1_test.dart`
 - `cd apps/lazynote_flutter && flutter test`
 
+## QA Summary (2026-02-20)
+
+Execution result:
+
+- split command paths, pane focus switching, and pane-local tab routing
+  passed QA.
+- keyboard routing (`Ctrl+Tab`, `Ctrl+Shift+Tab`) passed pane-local behavior
+  verification.
+- R1/R2/R3 post-review regressions are covered and passing.
+
+Observed limitations (accepted for v0.2 split baseline):
+
+- on narrower window widths, additional split attempts are rejected by the
+  `200px` min-size guard after the first split.
+- split-pane remove/merge (unsplit) action is not implemented in `PR-0206`.
+
+Conclusion:
+
+- QA passed with accepted limitations.
+- limitations are non-blocking for `PR-0206` scope and should be tracked as
+  follow-up UX enhancements (e.g. explicit unsplit/merge command).
+
 ## Acceptance Criteria
 
 - [x] M1 model/provider guardrails are landed and regression-covered.
