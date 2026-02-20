@@ -620,6 +620,26 @@ class _NotesPageState extends State<NotesPage>
                 parentNodeId: parentNodeId,
               );
             },
+        UiSlotContextKeys.notesOnCreateNoteInFolderRequested:
+            (String? parentNodeId) {
+              return _controller.createWorkspaceNoteInFolder(
+                parentNodeId: parentNodeId,
+              );
+            },
+        UiSlotContextKeys.notesOnRenameNodeRequested:
+            (String nodeId, String newName) {
+              return _controller.renameWorkspaceNode(
+                nodeId: nodeId,
+                newName: newName,
+              );
+            },
+        UiSlotContextKeys.notesOnMoveNodeRequested:
+            (String nodeId, String? newParentNodeId) {
+              return _controller.moveWorkspaceNode(
+                nodeId: nodeId,
+                newParentNodeId: newParentNodeId,
+              );
+            },
       }),
       listBuilder: (context, children) {
         return children.isEmpty

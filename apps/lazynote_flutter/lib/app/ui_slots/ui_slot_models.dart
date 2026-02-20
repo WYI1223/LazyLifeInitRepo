@@ -28,6 +28,11 @@ abstract final class UiSlotContextKeys {
       'notes_on_delete_folder_requested';
   static const String notesOnCreateFolderRequested =
       'notes_on_create_folder_requested';
+  static const String notesOnCreateNoteInFolderRequested =
+      'notes_on_create_note_in_folder_requested';
+  static const String notesOnRenameNodeRequested =
+      'notes_on_rename_node_requested';
+  static const String notesOnMoveNodeRequested = 'notes_on_move_node_requested';
 }
 
 /// Immutable per-render slot context bag.

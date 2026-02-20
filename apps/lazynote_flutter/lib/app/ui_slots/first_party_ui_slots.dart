@@ -157,13 +157,28 @@ void _registerNotesSlots(UiSlotRegistry registry) {
             .read<
               Future<rust_api.WorkspaceNodeResponse> Function(String, String?)
             >(UiSlotContextKeys.notesOnCreateFolderRequested);
+        final onCreateNoteInFolderRequested = slotContext
+            .read<Future<rust_api.WorkspaceActionResponse> Function(String?)>(
+              UiSlotContextKeys.notesOnCreateNoteInFolderRequested,
+            );
+        final onRenameNodeRequested = slotContext
+            .read<
+              Future<rust_api.WorkspaceActionResponse> Function(String, String)
+            >(UiSlotContextKeys.notesOnRenameNodeRequested);
+        final onMoveNodeRequested = slotContext
+            .read<
+              Future<rust_api.WorkspaceActionResponse> Function(String, String?)
+            >(UiSlotContextKeys.notesOnMoveNodeRequested);
         return NoteExplorer(
           controller: controller,
           onOpenNoteRequested: onOpenNoteRequested,
           onOpenNotePinnedRequested: onOpenNotePinnedRequested,
           onCreateNoteRequested: onCreateNoteRequested,
+          onCreateNoteInFolderRequested: onCreateNoteInFolderRequested,
           onCreateFolderRequested: onCreateFolderRequested,
           onDeleteFolderRequested: onDeleteFolderRequested,
+          onRenameNodeRequested: onRenameNodeRequested,
+          onMoveNodeRequested: onMoveNodeRequested,
         );
       },
     ),
