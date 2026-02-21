@@ -36,3 +36,5 @@ Thumbs.db
 # -----------------------------
 *.log
 *.tmp
+.claude/settings.local.json
+how-ref --heads --tags
