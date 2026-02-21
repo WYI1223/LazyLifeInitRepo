@@ -152,7 +152,7 @@ Recommended order:
    - `PR-0205B-explorer-tab-open-intent-migration` (completed: preview/pinned semantic ownership freeze)
    - `PR-0206-split-layout-v1` (in review: post-review remediation landed; QA summary logged with accepted v0.2 limitations)
    - `PR-0206B-split-pane-unsplit-merge` (in review: explicit pane close/merge command landed with regressions)
-   - `PR-0207-explorer-context-actions-dnd-baseline`
+   - `PR-0207-explorer-context-actions-dnd-baseline` (completed: M1/M2 feature landing + M3 closure)
    - `PR-0207A-explorer-note-ref-title-rename-freeze` (completed: v0.2 title/rename boundary closure)
 4. Support lane (parallel after shell baseline is stable):
    - `PR-0209-ui-localization-cn-en`
@@ -247,6 +247,7 @@ Recommended order:
    - [x] implement M2 drag controller + drop indicator
    - [x] wire drag move via `workspace_move_node` (same-parent reorder + cross-parent move)
    - [x] add M2 drag regressions (success/failure/invalid-target)
+   - [x] complete M3 closure (docs/contract sync + verification replay)
 
 ## Quality Gates
 

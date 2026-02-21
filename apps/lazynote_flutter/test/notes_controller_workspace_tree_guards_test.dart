@@ -132,15 +132,22 @@ void main() {
     },
   );
 
-  test('listWorkspaceChildren intercepts __uncategorized__ locally', () async {
-    var listCalls = 0;
+  test(
+    'listWorkspaceChildren maps __uncategorized__ without forwarding synthetic id',
+    () async {
+      final requestedParentIds = <String?>[];
     final controller = _buildController(
       store: <String, rust_api.NoteItem>{
         'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
       },
       workspaceListChildrenInvoker: ({parentNodeId}) async {
-        listCalls += 1;
-        throw StateError('should not be called for __uncategorized__');
+        requestedParentIds.add(parentNodeId);
+        return const rust_api.WorkspaceListChildrenResponse(
+          ok: true,
+          errorCode: null,
+          message: 'ok',
+          items: <rust_api.WorkspaceNodeItem>[],
+        );
       },
     );
     addTearDown(controller.dispose);
@@ -152,10 +159,12 @@ void main() {
 
     expect(response.ok, isTrue);
     expect(response.errorCode, isNull);
-    expect(listCalls, 0);
+    expect(requestedParentIds, isNotEmpty);
+    expect(requestedParentIds, isNot(contains('__uncategorized__')));
     expect(response.items, isNotEmpty);
     expect(response.items.first.parentNodeId, '__uncategorized__');
-  });
+    },
+  );
 
   test(
     'listWorkspaceChildren returns explicit error envelope on bridge exception',

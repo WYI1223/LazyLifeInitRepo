@@ -1,7 +1,7 @@
 # PR-0207-explorer-context-actions-dnd-baseline
 
 - Proposed title: `feat(notes-ui): explorer context actions and baseline drag reorder`
-- Status: In Review (M1 completed, M2 landed)
+- Status: Completed
 
 ## Goal
 
@@ -237,8 +237,8 @@ Verification replay (2026-02-20):
 
 ## Follow-up (M2+)
 
-- M2: drag reorder baseline (same-parent then cross-parent) with clear drop indicators.
-- M3: hardening/docs closure (error/retry UX, edge-case regression expansion).
+- M2: drag reorder baseline (same-parent then cross-parent) with clear drop indicators. (landed)
+- M3: hardening/docs closure (error/retry UX, edge-case regression expansion). (landed)
 
 ## Acceptance Criteria (M2)
 
@@ -248,3 +248,25 @@ Verification replay (2026-02-20):
 - [x] Source/target branches refresh deterministically after successful drop.
 - [x] Expansion-state preservation remains stable.
 - [x] M2 lands without FFI contract shape drift.
+
+## M3 Closure (landed)
+
+- synchronized M2 move callback contract across UI slot wiring and docs:
+  - `onMoveNodeRequested(nodeId, newParentNodeId, {targetOrder})`
+- finalized docs alignment:
+  - PR status, README execution checklist, and FFI contract notes are consistent
+- expanded regression guardrail set:
+  - added drag decision unit coverage (`explorer_drag_controller_test.dart`)
+  - retained M1/M2 integration suites as release guard
+
+## Acceptance Criteria (M3)
+
+- [x] PR status/docs/contract index are synchronized.
+- [x] Drag policy edge cases are regression-covered (same-kind reorder, cross-parent move, invalid drop).
+- [x] No additional FFI shape drift introduced by closure work.
+
+## Verification replay (2026-02-21)
+
+- `cd apps/lazynote_flutter && flutter analyze` passed.
+- `cd apps/lazynote_flutter && flutter test test/explorer_drag_controller_test.dart test/explorer_context_actions_test.dart test/note_explorer_tree_test.dart test/notes_page_explorer_slot_wiring_test.dart test/notes_controller_workspace_tree_guards_test.dart` passed.
+- `cd apps/lazynote_flutter && flutter test` passed.
