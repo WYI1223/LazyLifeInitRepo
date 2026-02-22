@@ -22,6 +22,7 @@ rust_api.NoteItem _note({
 NotesController _buildController({
   required Map<String, rust_api.NoteItem> store,
   NoteCreateInvoker? noteCreateInvoker,
+  WorkspaceDeleteFolderInvoker? workspaceDeleteFolderInvoker,
   WorkspaceCreateFolderInvoker? workspaceCreateFolderInvoker,
   WorkspaceCreateNoteRefInvoker? workspaceCreateNoteRefInvoker,
   WorkspaceRenameNodeInvoker? workspaceRenameNodeInvoker,
@@ -56,6 +57,7 @@ NotesController _buildController({
         tags: <String>[],
       );
     },
+    workspaceDeleteFolderInvoker: workspaceDeleteFolderInvoker,
     workspaceCreateFolderInvoker: workspaceCreateFolderInvoker,
     workspaceCreateNoteRefInvoker: workspaceCreateNoteRefInvoker,
     workspaceRenameNodeInvoker: workspaceRenameNodeInvoker,
@@ -128,7 +130,39 @@ void main() {
 
       expect(response.ok, isFalse);
       expect(response.errorCode, 'invalid_parent_node_id');
-      expect(createCalls, 0);
+    expect(createCalls, 0);
+  },
+  );
+
+  test(
+    'createWorkspaceFolder db_busy failure is actionable and non-destructive',
+    () async {
+      final controller = _buildController(
+        store: <String, rust_api.NoteItem>{
+          'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
+        },
+        workspaceCreateFolderInvoker: ({parentNodeId, required name}) async {
+          return const rust_api.WorkspaceNodeResponse(
+            ok: false,
+            errorCode: 'db_busy',
+            message: 'database is locked',
+            node: null,
+          );
+        },
+      );
+      addTearDown(controller.dispose);
+      await controller.loadNotes();
+      final revisionBefore = controller.workspaceTreeRevision;
+      final activeBefore = controller.activeNoteId;
+
+      final response = await controller.createWorkspaceFolder(name: 'Inbox');
+
+      expect(response.ok, isFalse);
+      expect(response.errorCode, 'db_busy');
+      expect(response.message, contains('Retry in a moment.'));
+      expect(controller.workspaceCreateFolderErrorMessage, response.message);
+      expect(controller.workspaceTreeRevision, revisionBefore);
+      expect(controller.activeNoteId, activeBefore);
     },
   );
 
@@ -266,4 +300,75 @@ void main() {
     expect(movedParentNodeId, isNull);
     expect(movedTargetOrder, isNull);
   });
+
+  test(
+    'moveWorkspaceNode db_busy failure is actionable and non-destructive',
+    () async {
+      final controller = _buildController(
+        store: <String, rust_api.NoteItem>{
+          'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
+        },
+        workspaceMoveNodeInvoker:
+            ({required nodeId, newParentId, targetOrder}) async {
+              return const rust_api.WorkspaceActionResponse(
+                ok: false,
+                errorCode: 'db_busy',
+                message: 'database is locked',
+              );
+            },
+      );
+      addTearDown(controller.dispose);
+      await controller.loadNotes();
+      final revisionBefore = controller.workspaceTreeRevision;
+      final activeBefore = controller.activeNoteId;
+
+      final response = await controller.moveWorkspaceNode(
+        nodeId: '11111111-1111-4111-8111-111111111111',
+        newParentNodeId: null,
+      );
+
+      expect(response.ok, isFalse);
+      expect(response.errorCode, 'db_busy');
+      expect(response.message, contains('Retry in a moment.'));
+      expect(controller.workspaceNodeMutationErrorMessage, response.message);
+      expect(controller.workspaceTreeRevision, revisionBefore);
+      expect(controller.activeNoteId, activeBefore);
+    },
+  );
+
+  test(
+    'deleteWorkspaceFolder db_error failure is actionable and non-destructive',
+    () async {
+      final controller = _buildController(
+        store: <String, rust_api.NoteItem>{
+          'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
+        },
+        workspaceDeleteFolderInvoker: ({required nodeId, required mode}) async {
+          return const rust_api.WorkspaceActionResponse(
+            ok: false,
+            errorCode: 'db_error',
+            message: 'open failed',
+          );
+        },
+      );
+      addTearDown(controller.dispose);
+      await controller.loadNotes();
+      final revisionBefore = controller.workspaceTreeRevision;
+      final tabsBefore = List<String>.from(controller.openNoteIds);
+      final activeBefore = controller.activeNoteId;
+
+      final response = await controller.deleteWorkspaceFolder(
+        folderId: '11111111-1111-4111-8111-111111111111',
+        mode: 'dissolve',
+      );
+
+      expect(response.ok, isFalse);
+      expect(response.errorCode, 'db_error');
+      expect(response.message, contains('Verify database access and retry.'));
+      expect(controller.workspaceDeleteErrorMessage, response.message);
+      expect(controller.workspaceTreeRevision, revisionBefore);
+      expect(controller.openNoteIds, tabsBefore);
+      expect(controller.activeNoteId, activeBefore);
+    },
+  );
 }

@@ -258,6 +258,14 @@ Recommended order:
    - [x] `PR-0207B`: freeze ordering + move semantics contract
    - [x] `PR-0207C`: implement no-reorder move policy + title-only rows + legacy note_ref backfill
    - [x] `PR-0207D`: closure replay (docs sync + migration/QA evidence + obsolete reorder cleanup)
+11. `PR-0208` workspace hardening and release closure
+   - [x] rewrite `PR-0208` into milestone-based execution plan (M1/M2/M3 + bridge regression matrix)
+   - [x] add WAL replay regression assertion after migration chain (`crates/lazynote_core/tests/db_migrations.rs`)
+   - [x] add workspace integration race bundle (`apps/lazynote_flutter/test/workspace_integration_flow_test.dart`)
+   - [x] M2 partial: actionable workspace mutation errors for `db_busy`/`db_error`
+   - [x] M2 partial: stale detail-response guard regression (`notes_controller_tabs_test.dart`)
+   - [x] complete M2 runtime hardening sweep from PR-0208 plan (notes/workspace core async + recovery paths)
+   - [ ] complete M3 docs closure and full replay evidence capture
 
 ## Quality Gates
 

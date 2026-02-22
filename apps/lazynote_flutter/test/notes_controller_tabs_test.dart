@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lazynote_flutter/core/bindings/api.dart' as rust_api;
 import 'package:lazynote_flutter/features/notes/notes_controller.dart';
@@ -215,6 +217,55 @@ void main() {
     expect(controller.activeNoteId, 'note-3');
     expect(controller.previewTabId, 'note-3');
     expect(controller.isPreviewTab('note-2'), isFalse);
+  });
+
+  test('stale detail response does not override newer active note', () async {
+    final store = <String, rust_api.NoteItem>{
+      'note-1': _note(atomId: 'note-1', content: '# first', updatedAt: 3),
+      'note-2': _note(atomId: 'note-2', content: '# second', updatedAt: 2),
+    };
+    var delayNextNote1Load = false;
+    final note1Gate = Completer<void>();
+    final detailLoadOrder = <String>[];
+
+    final controller = _buildController(
+      store: store,
+      noteGetInvoker: ({required atomId}) async {
+        detailLoadOrder.add(atomId);
+        if (atomId == 'note-1' && delayNextNote1Load) {
+          delayNextNote1Load = false;
+          await note1Gate.future;
+        }
+        final found = store[atomId];
+        return rust_api.NoteResponse(
+          ok: found != null,
+          errorCode: found == null ? 'note_not_found' : null,
+          message: found == null ? 'missing' : 'ok',
+          note: found,
+        );
+      },
+    );
+    addTearDown(controller.dispose);
+
+    await controller.loadNotes();
+    await controller.openNoteFromExplorer('note-2');
+    expect(controller.activeNoteId, 'note-2');
+
+    delayNextNote1Load = true;
+    final firstSwitch = controller.openNoteFromExplorer('note-1');
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.activeNoteId, 'note-1');
+    final secondSwitch = controller.openNoteFromExplorer('note-2');
+    await secondSwitch;
+
+    note1Gate.complete();
+    await firstSwitch;
+
+    expect(controller.activeNoteId, 'note-2');
+    expect(controller.selectedNote?.atomId, 'note-2');
+    expect(controller.detailErrorMessage, isNull);
+    expect(detailLoadOrder.where((id) => id == 'note-1').isNotEmpty, isTrue);
+    expect(detailLoadOrder.where((id) => id == 'note-2').isNotEmpty, isTrue);
   });
 
   test(

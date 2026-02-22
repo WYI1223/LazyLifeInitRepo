@@ -755,12 +755,18 @@ class NotesController extends ChangeNotifier {
         name: normalizedName,
       );
       if (!response.ok) {
-        _workspaceCreateFolderErrorMessage = _envelopeError(
+        final message = _workspaceActionErrorMessage(
           errorCode: response.errorCode,
           message: response.message,
           fallback: 'Failed to create workspace folder.',
         );
-        return response;
+        _workspaceCreateFolderErrorMessage = message;
+        return rust_api.WorkspaceNodeResponse(
+          ok: false,
+          errorCode: response.errorCode,
+          message: message,
+          node: response.node,
+        );
       }
       _workspaceCreateFolderErrorMessage = null;
       _bumpWorkspaceTreeRevision();
@@ -845,7 +851,7 @@ class NotesController extends ChangeNotifier {
         displayName: null,
       );
       if (!linkResponse.ok) {
-        final message = _envelopeError(
+        final message = _workspaceActionErrorMessage(
           errorCode: linkResponse.errorCode,
           message: linkResponse.message,
           fallback: 'Note created, but linking into workspace failed.',
@@ -918,12 +924,17 @@ class NotesController extends ChangeNotifier {
         newName: normalizedName,
       );
       if (!response.ok) {
-        _workspaceNodeMutationErrorMessage = _envelopeError(
+        final message = _workspaceActionErrorMessage(
           errorCode: response.errorCode,
           message: response.message,
           fallback: 'Failed to rename workspace node.',
         );
-        return response;
+        _workspaceNodeMutationErrorMessage = message;
+        return rust_api.WorkspaceActionResponse(
+          ok: false,
+          errorCode: response.errorCode,
+          message: message,
+        );
       }
       _workspaceNodeMutationErrorMessage = null;
       _bumpWorkspaceTreeRevision();
@@ -991,12 +1002,17 @@ class NotesController extends ChangeNotifier {
         targetOrder: null,
       );
       if (!response.ok) {
-        _workspaceNodeMutationErrorMessage = _envelopeError(
+        final message = _workspaceActionErrorMessage(
           errorCode: response.errorCode,
           message: response.message,
           fallback: 'Failed to move workspace node.',
         );
-        return response;
+        _workspaceNodeMutationErrorMessage = message;
+        return rust_api.WorkspaceActionResponse(
+          ok: false,
+          errorCode: response.errorCode,
+          message: message,
+        );
       }
       _workspaceNodeMutationErrorMessage = null;
       _bumpWorkspaceTreeRevision();
@@ -1109,12 +1125,17 @@ class NotesController extends ChangeNotifier {
         mode: normalizedMode,
       );
       if (!response.ok) {
-        _workspaceDeleteErrorMessage = _envelopeError(
+        final message = _workspaceActionErrorMessage(
           errorCode: response.errorCode,
           message: response.message,
           fallback: 'Failed to delete workspace folder.',
         );
-        return response;
+        _workspaceDeleteErrorMessage = message;
+        return rust_api.WorkspaceActionResponse(
+          ok: false,
+          errorCode: response.errorCode,
+          message: message,
+        );
       }
 
       await _loadNotes(
@@ -2631,6 +2652,25 @@ class NotesController extends ChangeNotifier {
       return '[$errorCode] $fallback';
     }
     return '[$errorCode] $normalized';
+  }
+
+  String _workspaceActionErrorMessage({
+    required String? errorCode,
+    required String message,
+    required String fallback,
+  }) {
+    final normalized = _envelopeError(
+      errorCode: errorCode,
+      message: message,
+      fallback: fallback,
+    );
+    if (errorCode == 'db_busy') {
+      return '$normalized Retry in a moment.';
+    }
+    if (errorCode == 'db_error') {
+      return '$normalized Verify database access and retry.';
+    }
+    return normalized;
   }
 
   _WorkspaceParentValidation _normalizeWorkspaceParentId(String? raw) {

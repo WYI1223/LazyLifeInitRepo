@@ -56,6 +56,20 @@ fn opening_same_database_twice_is_idempotent() {
 }
 
 #[test]
+fn open_db_enforces_wal_mode_after_migration_replay() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("wal-check.db");
+
+    let conn = open_db(&path).unwrap();
+    assert_eq!(schema_version(&conn), latest_version());
+
+    let journal_mode: String = conn
+        .query_row("PRAGMA journal_mode;", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(journal_mode.to_lowercase(), "wal");
+}
+
+#[test]
 fn opening_database_with_newer_schema_version_returns_error() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("future.db");
