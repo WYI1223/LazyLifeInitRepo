@@ -107,9 +107,13 @@ This PR consumes existing workspace-tree APIs and does not change FFI shape.
   - root presentation requirement:
     - root folder list remains folder-only in UI projection
     - root `note_ref` visibility is owned by `Uncategorized` projection (single source)
-  - explorer row ordering projection (UI-local):
-    - children are grouped by kind: `folder` first, `note_ref` second
-    - within same kind, rows use `sort_order` ascending, then `node_id` for tie-break
+  - explorer ordering transition freeze (PR-0207B; runtime alignment in PR-0207C):
+    - root projection: synthetic `Uncategorized` first, then folders by name ascending
+      (case-insensitive), tie-break `node_id ASC`
+    - normal folder children: `folder` group first, `note_ref` group second
+    - within each group: name ascending (case-insensitive), tie-break `node_id ASC`
+    - `Uncategorized` note rows: `updated_at DESC`, then `atom_id ASC`
+    - same-parent manual reorder is not a UI contract capability in this transition
 - bridge exception policy:
   - when bridge is unavailable (e.g. test host without Rust init), controller may
     use deterministic synthetic fallback
@@ -191,7 +195,9 @@ This milestone extends explorer interactions while reusing existing contracts.
     - `notes_on_rename_node_requested`
     - `notes_on_move_node_requested`
       - M1/menu path: `(node_id, new_parent_node_id)` (`target_order = null`)
-      - M2/drag path: `(node_id, new_parent_node_id, {target_order})`
+      - M2/drag baseline path: `(node_id, new_parent_node_id, {target_order})`
+      - PR-0207B transition freeze target: parent-change-only move, UI path uses
+        `target_order = null`
   - move uses minimal target-parent dialog (drag reorder is M2)
   - explorer refresh must preserve expand/collapse state after actions
   - successful child-folder delete must refresh affected parent branch to avoid stale child rows
@@ -214,9 +220,12 @@ All APIs are use-case level and async.
 - `workspace_create_note_ref(parent_node_id?, atom_id, display_name?) -> WorkspaceNodeResponse`
 - `workspace_rename_node(node_id, new_name) -> WorkspaceActionResponse`
 - `workspace_move_node(node_id, new_parent_id?, target_order?) -> WorkspaceActionResponse`
-  - `target_order` is normalized by clamp in v0.2:
+  - backend compatibility behavior:
+    - `target_order` is normalized by clamp in current core behavior
     - `< 0` -> `0`
     - `> sibling_count` -> append at tail
+  - UI transition freeze (PR-0207B): same-parent reorder is not exposed; UI move
+    requests are parent-change-only and pass `target_order = null`
 - `workspace_delete_folder(node_id, mode) -> WorkspaceActionResponse`
   - `mode`: `dissolve` | `delete_all`
 
@@ -234,7 +243,7 @@ UI policy freeze (v0.2):
 - `parent_node_id`
 - `atom_id`
 - `display_name`
-- `sort_order`
+- `sort_order` (backend compatibility ordering key; no direct same-parent reorder UI contract)
 
 Envelope rules:
 

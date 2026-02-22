@@ -157,7 +157,7 @@ Recommended order:
    - `PR-0206B-split-pane-unsplit-merge` (in review: explicit pane close/merge command landed with regressions)
    - `PR-0207-explorer-context-actions-dnd-baseline` (completed: M1/M2 feature landing + M3 closure)
    - `PR-0207A-explorer-note-ref-title-rename-freeze` (completed: v0.2 title/rename boundary closure)
-   - `PR-0207B-explorer-ordering-contract-freeze` (planned)
+   - `PR-0207B-explorer-ordering-contract-freeze` (completed: docs contract freeze landed)
    - `PR-0207C-explorer-ordering-and-backfill-implementation` (planned)
    - `PR-0207D-explorer-ordering-closure` (planned)
 4. Support lane (parallel after shell baseline is stable):
@@ -255,7 +255,7 @@ Recommended order:
    - [x] add M2 drag regressions (success/failure/invalid-target)
    - [x] complete M3 closure (docs/contract sync + verification replay)
 10. `PR-0207B/0207C/0207D` ordering/move transition lane
-   - [ ] `PR-0207B`: freeze ordering + move semantics contract
+   - [x] `PR-0207B`: freeze ordering + move semantics contract
    - [ ] `PR-0207C`: implement no-reorder move policy + title-only rows + legacy note_ref backfill
    - [ ] `PR-0207D`: closure replay (docs sync + migration/QA evidence + obsolete reorder cleanup)
 

@@ -43,7 +43,7 @@ Code reference: `crates/lazynote_core/src/model/atom.rs`.
 | `parent_uuid` | TEXT | YES | Parent workspace node id (`NULL` = root) |
 | `atom_uuid` | TEXT | YES | Required for `note_ref`; must be `NULL` for `folder` |
 | `display_name` | TEXT | NO | Node label field (`folder` authoritative; `note_ref` reserved for compatibility/placeholder in v0.2) |
-| `sort_order` | INTEGER | NO | Deterministic sibling order key |
+| `sort_order` | INTEGER | NO | Backend compatibility ordering key for deterministic storage/replay |
 | `is_deleted` | INTEGER | NO | `0 \| 1` soft-delete marker |
 | `created_at` | INTEGER | NO | Epoch ms |
 | `updated_at` | INTEGER | NO | Epoch ms |
@@ -54,7 +54,7 @@ Code reference: `crates/lazynote_core/src/model/atom.rs`.
 2. `kind='note_ref'` must carry `atom_uuid`; create/update validates target as an active note atom.
 3. `parent_uuid` may be `NULL` (root) or reference another `workspace_nodes.node_uuid`.
 4. Service layer rejects cycle-producing moves (`A -> ... -> A`).
-5. Child listing order is deterministic: `sort_order ASC, node_uuid ASC`.
+5. Core child listing order is deterministic for storage/replay: `sort_order ASC, node_uuid ASC`.
 6. Atom delete/type change is not blocked by existing `note_ref`; references may become dangling.
 7. Tree read paths hide invalid `note_ref` and only surface active-note references.
 
@@ -69,6 +69,19 @@ This is a product-boundary policy layered on top of the schema:
 3. `workspace_nodes.display_name` remains in schema for forward compatibility, but `note_ref` rename is frozen in v0.2.
 4. `folder` rename remains fully supported and uses `workspace_nodes.display_name` as the authoritative folder label.
 5. Independent `note_ref` alias/title editing is deferred to a later milestone (v3+).
+
+### Explorer Ordering/Move Transition Freeze (v0.2)
+
+This is a UI policy freeze that coexists with the current schema:
+
+1. Explorer move is parent-change-only; same-parent manual reorder is not a user capability.
+2. `workspace_move_node(..., target_order?)` is retained for compatibility, but UI move paths use `target_order = null`.
+3. Explorer row order policy:
+   - root: synthetic `Uncategorized` first, then folders by name ascending (case-insensitive)
+   - folder children: `folder` group first, `note_ref` group second
+   - within each group: name ascending (case-insensitive), stable id tie-break
+   - `Uncategorized` note rows: by note `updated_at DESC`, then note id tie-break
+4. Explorer note rows are title-only (no preview text line in row rendering).
 
 ---
 

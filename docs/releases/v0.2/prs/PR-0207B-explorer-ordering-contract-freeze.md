@@ -1,7 +1,7 @@
 # PR-0207B-explorer-ordering-contract-freeze
 
 - Proposed title: `docs(workspace-tree): freeze explorer ordering and move semantics`
-- Status: Planned
+- Status: Completed
 
 ## Goal
 
@@ -57,16 +57,23 @@ Out of scope:
 
 ## Planned Doc Changes
 
-- [edit] `docs/api/ffi-contracts.md`
-- [edit] `docs/api/workspace-tree-contract.md`
-- [edit] `docs/architecture/data-model.md`
-- [edit] `docs/releases/v0.2/prs/PR-0207-explorer-context-actions-dnd-baseline.md`
-- [edit] `docs/releases/v0.2/README.md`
+- [x] `docs/api/ffi-contracts.md`
+- [x] `docs/api/workspace-tree-contract.md`
+- [x] `docs/architecture/data-model.md`
+- [x] `docs/releases/v0.2/prs/PR-0207-explorer-context-actions-dnd-baseline.md`
+- [x] `docs/releases/v0.2/README.md`
+
+## Execution Notes (2026-02-22)
+
+1. Contract docs now explicitly freeze parent-change-only move semantics.
+2. Same-parent reorder is marked as compatibility/legacy behavior pending runtime removal in `PR-0207C`.
+3. Explorer note-row contract is frozen to title-only (no preview text).
+4. `sort_order` is documented as backend compatibility ordering key, not a UI reorder capability.
 
 ## Acceptance Criteria
 
-- [ ] Ordering contract is explicit and unambiguous (root/folder/uncategorized).
-- [ ] Move contract clearly states "parent change only, no same-parent reorder".
-- [ ] Note-row contract clearly states "title-only, no preview text".
-- [ ] Legacy-note backfill requirement is documented as mandatory follow-up.
-- [ ] Contract docs and release plan are synchronized.
+- [x] Ordering contract is explicit and unambiguous (root/folder/uncategorized).
+- [x] Move contract clearly states "parent change only, no same-parent reorder".
+- [x] Note-row contract clearly states "title-only, no preview text".
+- [x] Legacy-note backfill requirement is documented as mandatory follow-up.
+- [x] Contract docs and release plan are synchronized.

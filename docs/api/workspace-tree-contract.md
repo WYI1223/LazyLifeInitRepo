@@ -44,19 +44,26 @@ This document defines Flutter-callable workspace tree contracts exposed by
 5. `workspace_delete_folder` requires explicit mode.
    - `dissolve`
    - `delete_all`
-6. `workspace_move_node` normalizes `target_order` by clamping to visible sibling range.
+6. `workspace_move_node` keeps shape compatibility for `target_order`.
+7. Core currently normalizes non-null `target_order` by clamping to visible sibling range.
    - `< 0` -> `0`
    - `> sibling_count` -> append at tail (`sibling_count`)
-7. API-layer rename is generic (`workspace_rename_node`), but v0.2 Notes UI policy only exposes rename on `folder` rows.
-8. Root-level note refs may be rendered by Flutter under synthetic `Uncategorized`; this is a UI projection, not a core schema node.
-9. v0.2 `Uncategorized` projection requirements.
+8. v0.2 transition UI policy (PR-0207B freeze): same-parent reorder is not supported in Explorer.
+   - UI-originated move is parent-change-only
+   - UI passes `target_order = null` (runtime alignment lands in PR-0207C)
+9. API-layer rename is generic (`workspace_rename_node`), but v0.2 Notes UI policy only exposes rename on `folder` rows.
+10. Root-level note refs may be rendered by Flutter under synthetic `Uncategorized`; this is a UI projection, not a core schema node.
+11. v0.2 `Uncategorized` projection requirements.
    - include root-level `note_ref` + legacy notes with no workspace reference
    - do not duplicate notes already referenced under workspace folders
    - avoid rendering the same root `note_ref` both at root and under `Uncategorized`
-10. Notes Explorer applies UI-local row ordering projection for readability.
-   - children are grouped `folder` before `note_ref`
-   - within kind groups, rows follow `sort_order ASC, node_id ASC`
-   - this is a presentation rule and does not alter core persisted ordering semantics
+12. Notes Explorer ordering freeze (PR-0207B; runtime alignment in PR-0207C).
+   - root projection: synthetic `Uncategorized` first, then folders by name ascending
+     (case-insensitive), tie-break `node_id ASC`
+   - normal folder children: `folder` group first, `note_ref` group second
+   - within each group: name ascending (case-insensitive), tie-break `node_id ASC`
+   - `Uncategorized` note rows: `updated_at DESC`, then `atom_id ASC`
+13. Note rows in Explorer are title-only in v0.2 transition policy; preview text is not rendered.
 
 ## Error Codes
 
