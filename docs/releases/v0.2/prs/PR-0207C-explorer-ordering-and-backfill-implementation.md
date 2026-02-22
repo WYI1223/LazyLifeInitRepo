@@ -1,7 +1,7 @@
 # PR-0207C-explorer-ordering-and-backfill-implementation
 
 - Proposed title: `feat(workspace-tree): implement canonical ordering + legacy note_ref backfill`
-- Status: Planned (depends on PR-0207B)
+- Status: In Progress (depends on PR-0207B)
 
 ## Goal
 
@@ -69,7 +69,7 @@ Out of scope:
 - [edit] `apps/lazynote_flutter/test/explorer_drag_controller_test.dart`
 - [edit] `apps/lazynote_flutter/test/note_explorer_tree_test.dart`
 - [edit] `apps/lazynote_flutter/test/notes_controller_workspace_tree_guards_test.dart`
-- [add] `crates/lazynote_core/src/db/migrations/0010_workspace_note_ref_backfill.sql`
+- [add] `crates/lazynote_core/src/db/migrations/0009_workspace_note_ref_backfill.sql`
 - [edit] `crates/lazynote_core/src/db/migrations/mod.rs`
 - [edit] `crates/lazynote_core/tests/db_migrations.rs`
 

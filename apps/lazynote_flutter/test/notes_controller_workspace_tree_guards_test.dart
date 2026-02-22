@@ -136,33 +136,33 @@ void main() {
     'listWorkspaceChildren maps __uncategorized__ without forwarding synthetic id',
     () async {
       final requestedParentIds = <String?>[];
-    final controller = _buildController(
-      store: <String, rust_api.NoteItem>{
-        'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
-      },
-      workspaceListChildrenInvoker: ({parentNodeId}) async {
-        requestedParentIds.add(parentNodeId);
-        return const rust_api.WorkspaceListChildrenResponse(
-          ok: true,
-          errorCode: null,
-          message: 'ok',
-          items: <rust_api.WorkspaceNodeItem>[],
-        );
-      },
-    );
-    addTearDown(controller.dispose);
-    await controller.loadNotes();
+      final controller = _buildController(
+        store: <String, rust_api.NoteItem>{
+          'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
+        },
+        workspaceListChildrenInvoker: ({parentNodeId}) async {
+          requestedParentIds.add(parentNodeId);
+          return const rust_api.WorkspaceListChildrenResponse(
+            ok: true,
+            errorCode: null,
+            message: 'ok',
+            items: <rust_api.WorkspaceNodeItem>[],
+          );
+        },
+      );
+      addTearDown(controller.dispose);
+      await controller.loadNotes();
 
-    final response = await controller.listWorkspaceChildren(
-      parentNodeId: '__uncategorized__',
-    );
+      final response = await controller.listWorkspaceChildren(
+        parentNodeId: '__uncategorized__',
+      );
 
-    expect(response.ok, isTrue);
-    expect(response.errorCode, isNull);
-    expect(requestedParentIds, isNotEmpty);
-    expect(requestedParentIds, isNot(contains('__uncategorized__')));
-    expect(response.items, isNotEmpty);
-    expect(response.items.first.parentNodeId, '__uncategorized__');
+      expect(response.ok, isTrue);
+      expect(response.errorCode, isNull);
+      expect(requestedParentIds, isNotEmpty);
+      expect(requestedParentIds, isNot(contains('__uncategorized__')));
+      expect(response.items, isNotEmpty);
+      expect(response.items.first.parentNodeId, '__uncategorized__');
     },
   );
 
@@ -238,6 +238,7 @@ void main() {
 
   test('moveWorkspaceNode maps __uncategorized__ target to root', () async {
     String? movedParentNodeId;
+    int? movedTargetOrder;
     final controller = _buildController(
       store: <String, rust_api.NoteItem>{
         'note-1': _note(atomId: 'note-1', content: '# one', updatedAt: 1),
@@ -245,6 +246,7 @@ void main() {
       workspaceMoveNodeInvoker:
           ({required nodeId, newParentId, targetOrder}) async {
             movedParentNodeId = newParentId;
+            movedTargetOrder = targetOrder;
             return const rust_api.WorkspaceActionResponse(
               ok: true,
               errorCode: null,
@@ -257,9 +259,11 @@ void main() {
     final response = await controller.moveWorkspaceNode(
       nodeId: '11111111-1111-4111-8111-111111111111',
       newParentNodeId: '__uncategorized__',
+      targetOrder: 7,
     );
 
     expect(response.ok, isTrue);
     expect(movedParentNodeId, isNull);
+    expect(movedTargetOrder, isNull);
   });
 }

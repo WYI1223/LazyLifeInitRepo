@@ -190,6 +190,7 @@ List section membership (Inbox/Today/Upcoming) is derived from time fields, not 
 | 6 | `0006_time_matrix.sql` | Rename `event_start`→`start_at`, `event_end`→`end_at`; add `recurrence_rule TEXT` |
 | 7 | `0007_workspace_tree.sql` | Add `workspace_nodes`, ordering index, and note-ref integrity triggers |
 | 8 | `0008_workspace_tree_delete_policy.sql` | Remove atom-side blocking triggers and switch tree visibility to read-time filtering |
+| 9 | `0009_workspace_note_ref_backfill.sql` | Backfill root-level `note_ref` for active notes missing active workspace references |
 
 ---
 

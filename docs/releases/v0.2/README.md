@@ -132,7 +132,7 @@ Recommended order:
    - `PR-0202-notes-tree-schema-core`
    - `PR-0221-workspace-tree-delete-policy-hybrid`
    - `PR-0203-tree-ffi-contracts`
-   - migration numbering note: reserve `0008` for workspace policy; links uses `0009`
+   - migration numbering note: `0008` workspace delete policy, `0009` workspace note_ref backfill, links uses `0010`
    - current priority (execution refinement):
      - `PR-0202` tree schema/repo/service baseline is completed (status calibrated; delete-policy extension tracked in `PR-0221`)
      - `PR-0203` Workspace CRUD FFI parity is completed (create/list/rename/move + delete contract alignment)

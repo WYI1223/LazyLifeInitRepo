@@ -976,6 +976,7 @@ class NotesController extends ChangeNotifier {
       _WorkspaceParentValidation.value => newParentNodeId?.trim(),
       _WorkspaceParentValidation.invalid => null,
     };
+    final _ = targetOrder;
 
     _workspaceNodeMutationInFlight = true;
     _workspaceNodeMutationErrorMessage = null;
@@ -985,7 +986,9 @@ class NotesController extends ChangeNotifier {
       final response = await _workspaceMoveNodeInvoker(
         nodeId: normalizedNodeId,
         newParentId: parentForMove,
-        targetOrder: targetOrder,
+        // v0.2 transition freeze: UI move path is parent-change-only.
+        // Keep `targetOrder` in API shape for compatibility, but do not pass it.
+        targetOrder: null,
       );
       if (!response.ok) {
         _workspaceNodeMutationErrorMessage = _envelopeError(
@@ -2753,8 +2756,8 @@ class NotesController extends ChangeNotifier {
         }
       }
 
-      final projectedItems = <rust_api.WorkspaceNodeItem>[];
-      var maxSortOrder = -1;
+      final projectedRows = <_ProjectedUncategorizedRow>[];
+      final projectedAtomIds = <String>{};
       for (final item in rootItems ?? const <rust_api.WorkspaceNodeItem>[]) {
         if (item.kind != 'note_ref') {
           continue;
@@ -2763,51 +2766,56 @@ class NotesController extends ChangeNotifier {
         if (atomId == null || atomId.isEmpty) {
           continue;
         }
+        if (!projectedAtomIds.add(atomId)) {
+          continue;
+        }
         final note = noteById(atomId);
         final projectedDisplayName = note == null
             ? (item.displayName.trim().isEmpty ? 'Untitled' : item.displayName)
             : _titleFromContent(note.content);
-        projectedItems.add(
-          rust_api.WorkspaceNodeItem(
+        projectedRows.add(
+          _ProjectedUncategorizedRow(
             nodeId: item.nodeId,
-            kind: 'note_ref',
-            parentNodeId: _uncategorizedFolderNodeId,
-            atomId: item.atomId,
+            atomId: atomId,
             displayName: projectedDisplayName,
-            sortOrder: item.sortOrder,
+            updatedAt: note?.updatedAt ?? 0,
           ),
         );
-        if (item.sortOrder > maxSortOrder) {
-          maxSortOrder = item.sortOrder;
-        }
       }
 
-      var nextSortOrder = maxSortOrder + 1;
       for (final note in _items) {
         final atomId = note.atomId.trim();
         if (atomId.isEmpty || referencedAtomIds.contains(atomId)) {
           continue;
         }
-        projectedItems.add(
-          rust_api.WorkspaceNodeItem(
+        if (!projectedAtomIds.add(atomId)) {
+          continue;
+        }
+        projectedRows.add(
+          _ProjectedUncategorizedRow(
             nodeId: 'note_ref_uncategorized_${note.atomId}',
-            kind: 'note_ref',
-            parentNodeId: _uncategorizedFolderNodeId,
-            atomId: note.atomId,
+            atomId: atomId,
             displayName: _titleFromContent(note.content),
-            sortOrder: nextSortOrder,
+            updatedAt: note.updatedAt,
           ),
         );
-        nextSortOrder += 1;
       }
 
-      projectedItems.sort((left, right) {
-        final byOrder = left.sortOrder.compareTo(right.sortOrder);
-        if (byOrder != 0) {
-          return byOrder;
-        }
-        return left.nodeId.compareTo(right.nodeId);
-      });
+      projectedRows.sort(_compareProjectedUncategorizedRow);
+      final projectedItems = <rust_api.WorkspaceNodeItem>[];
+      for (var index = 0; index < projectedRows.length; index += 1) {
+        final row = projectedRows[index];
+        projectedItems.add(
+          rust_api.WorkspaceNodeItem(
+            nodeId: row.nodeId,
+            kind: 'note_ref',
+            parentNodeId: _uncategorizedFolderNodeId,
+            atomId: row.atomId,
+            displayName: row.displayName,
+            sortOrder: index,
+          ),
+        );
+      }
       return rust_api.WorkspaceListChildrenResponse(
         ok: true,
         errorCode: null,
@@ -2830,8 +2838,16 @@ class NotesController extends ChangeNotifier {
   rust_api.WorkspaceListChildrenResponse
   _legacySyntheticUncategorizedChildren() {
     final items = <rust_api.WorkspaceNodeItem>[];
-    var sortOrder = 0;
-    for (final note in _items) {
+    final sortedNotes = List<rust_api.NoteItem>.from(_items)
+      ..sort((left, right) {
+        final byUpdated = right.updatedAt.compareTo(left.updatedAt);
+        if (byUpdated != 0) {
+          return byUpdated;
+        }
+        return left.atomId.compareTo(right.atomId);
+      });
+    for (var index = 0; index < sortedNotes.length; index += 1) {
+      final note = sortedNotes[index];
       items.add(
         rust_api.WorkspaceNodeItem(
           nodeId: 'note_ref_uncategorized_${note.atomId}',
@@ -2839,10 +2855,9 @@ class NotesController extends ChangeNotifier {
           parentNodeId: _uncategorizedFolderNodeId,
           atomId: note.atomId,
           displayName: _titleFromContent(note.content),
-          sortOrder: sortOrder,
+          sortOrder: index,
         ),
       );
-      sortOrder += 1;
     }
     return rust_api.WorkspaceListChildrenResponse(
       ok: true,
@@ -2958,6 +2973,35 @@ class NotesController extends ChangeNotifier {
     }
     return 'Untitled';
   }
+}
+
+class _ProjectedUncategorizedRow {
+  const _ProjectedUncategorizedRow({
+    required this.nodeId,
+    required this.atomId,
+    required this.displayName,
+    required this.updatedAt,
+  });
+
+  final String nodeId;
+  final String atomId;
+  final String displayName;
+  final int updatedAt;
+}
+
+int _compareProjectedUncategorizedRow(
+  _ProjectedUncategorizedRow left,
+  _ProjectedUncategorizedRow right,
+) {
+  final byUpdatedAt = right.updatedAt.compareTo(left.updatedAt);
+  if (byUpdatedAt != 0) {
+    return byUpdatedAt;
+  }
+  final byAtomId = left.atomId.compareTo(right.atomId);
+  if (byAtomId != 0) {
+    return byAtomId;
+  }
+  return left.nodeId.compareTo(right.nodeId);
 }
 
 enum _WorkspaceParentValidation { root, value, invalid }

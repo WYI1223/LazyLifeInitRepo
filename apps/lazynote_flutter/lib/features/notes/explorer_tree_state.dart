@@ -15,6 +15,7 @@ class ExplorerTreeState extends ChangeNotifier {
   final ExplorerChildrenLoader _childrenLoader;
 
   static const String _rootKey = '__root__';
+  static const String _uncategorizedNodeId = '__uncategorized__';
 
   final Map<String, List<rust_api.WorkspaceNodeItem>> _childrenByParent =
       <String, List<rust_api.WorkspaceNodeItem>>{};
@@ -131,17 +132,13 @@ class ExplorerTreeState extends ChangeNotifier {
       }
 
       final sorted = List<rust_api.WorkspaceNodeItem>.from(response.items)
-        ..sort((a, b) {
-          final kindOrder = _kindRank(a.kind).compareTo(_kindRank(b.kind));
-          if (kindOrder != 0) {
-            return kindOrder;
-          }
-          final order = a.sortOrder.compareTo(b.sortOrder);
-          if (order != 0) {
-            return order;
-          }
-          return a.nodeId.compareTo(b.nodeId);
-        });
+        ..sort(
+          (a, b) => _compareExplorerRows(
+            parentNodeId: parentNodeId,
+            left: a,
+            right: b,
+          ),
+        );
       _childrenByParent[parentKey] =
           List<rust_api.WorkspaceNodeItem>.unmodifiable(sorted);
       _errorByParent.remove(parentKey);
@@ -171,8 +168,48 @@ class ExplorerTreeState extends ChangeNotifier {
     return '[$errorCode] $normalized';
   }
 
-  int _kindRank(String kind) {
-    switch (kind) {
+  int _compareExplorerRows({
+    required String? parentNodeId,
+    required rust_api.WorkspaceNodeItem left,
+    required rust_api.WorkspaceNodeItem right,
+  }) {
+    if (parentNodeId == _uncategorizedNodeId) {
+      final byOrder = left.sortOrder.compareTo(right.sortOrder);
+      if (byOrder != 0) {
+        return byOrder;
+      }
+      final byAtom = (left.atomId ?? '').compareTo(right.atomId ?? '');
+      if (byAtom != 0) {
+        return byAtom;
+      }
+      return left.nodeId.compareTo(right.nodeId);
+    }
+
+    final kindOrder = _kindRank(
+      parentNodeId: parentNodeId,
+      node: left,
+    ).compareTo(_kindRank(parentNodeId: parentNodeId, node: right));
+    if (kindOrder != 0) {
+      return kindOrder;
+    }
+
+    final leftName = _normalizeName(left);
+    final rightName = _normalizeName(right);
+    final byName = leftName.compareTo(rightName);
+    if (byName != 0) {
+      return byName;
+    }
+    return left.nodeId.compareTo(right.nodeId);
+  }
+
+  int _kindRank({
+    required String? parentNodeId,
+    required rust_api.WorkspaceNodeItem node,
+  }) {
+    if (parentNodeId == null && node.nodeId == _uncategorizedNodeId) {
+      return -1;
+    }
+    switch (node.kind) {
       case 'folder':
         return 0;
       case 'note_ref':
@@ -180,5 +217,13 @@ class ExplorerTreeState extends ChangeNotifier {
       default:
         return 2;
     }
+  }
+
+  String _normalizeName(rust_api.WorkspaceNodeItem node) {
+    final normalized = node.displayName.trim().toLowerCase();
+    if (normalized.isNotEmpty) {
+      return normalized;
+    }
+    return node.nodeId.trim().toLowerCase();
   }
 }

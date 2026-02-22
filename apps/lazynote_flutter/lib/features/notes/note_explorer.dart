@@ -753,7 +753,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
   Widget _wrapWorkspaceRowWithDrag({
     required BuildContext context,
     required rust_api.WorkspaceNodeItem node,
-    required List<rust_api.WorkspaceNodeItem> siblings,
     required int depth,
     required Widget child,
   }) {
@@ -803,17 +802,11 @@ class _NoteExplorerState extends State<NoteExplorer> {
 
     return DragTarget<ExplorerDragPayload>(
       onWillAcceptWithDetails: (details) =>
-          _resolveRowDropPlan(
-            payload: details.data,
-            targetNode: node,
-            siblings: siblings,
-          ) !=
-          null,
+          _resolveRowDropPlan(payload: details.data, targetNode: node) != null,
       onAcceptWithDetails: (details) {
         final plan = _resolveRowDropPlan(
           payload: details.data,
           targetNode: node,
-          siblings: siblings,
         );
         if (plan == null) {
           return;
@@ -832,28 +825,13 @@ class _NoteExplorerState extends State<NoteExplorer> {
         }
         final plan = candidate == null
             ? null
-            : _resolveRowDropPlan(
-                payload: candidate,
-                targetNode: node,
-                siblings: siblings,
-              );
+            : _resolveRowDropPlan(payload: candidate, targetNode: node);
         if (plan == null) {
           return draggableChild;
         }
-        final isReorder = plan.isReorder;
         return DecoratedBox(
           decoration: BoxDecoration(
-            border: Border(
-              top: BorderSide(
-                color: isReorder
-                    ? kNotesSecondaryText.withValues(alpha: 0.8)
-                    : Colors.transparent,
-                width: isReorder ? 2 : 0,
-              ),
-            ),
-            color: !isReorder
-                ? kNotesItemSelectedColor.withValues(alpha: 0.35)
-                : Colors.transparent,
+            color: kNotesItemSelectedColor.withValues(alpha: 0.35),
           ),
           child: draggableChild,
         );
@@ -864,12 +842,10 @@ class _NoteExplorerState extends State<NoteExplorer> {
   ExplorerDropPlan? _resolveRowDropPlan({
     required ExplorerDragPayload payload,
     required rust_api.WorkspaceNodeItem targetNode,
-    required List<rust_api.WorkspaceNodeItem> siblings,
   }) {
     return _dragController.planForRowDrop(
       payload: payload,
       targetNode: targetNode,
-      siblings: siblings,
       normalizeParent: _normalizeParentForMutation,
       isStableNodeId: (nodeId) => _looksLikeUuid(nodeId),
       isSyntheticRootNodeId: _isSyntheticRootNodeId,
@@ -943,7 +919,7 @@ class _NoteExplorerState extends State<NoteExplorer> {
     final response = await invoker(
       payload.nodeId,
       plan.newParentNodeId,
-      targetOrder: plan.targetOrder,
+      targetOrder: null,
     );
     if (!mounted) {
       return;
@@ -1226,7 +1202,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
           _wrapWorkspaceRowWithDrag(
             context: context,
             node: item,
-            siblings: items,
             depth: depth,
             child: folderRow,
           ),
@@ -1339,7 +1314,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
         depth: depth + 1,
         selected: noteId == widget.controller.activeNoteId,
         onTap: () => _handleNoteTap(noteId),
-        previewText: _previewText(noteId: noteId, note: note),
         onSecondaryTapDown: (details) {
           _recordRowContextMenuTrigger(details.globalPosition);
           unawaited(
@@ -1355,7 +1329,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
         _wrapWorkspaceRowWithDrag(
           context: context,
           node: item,
-          siblings: items,
           depth: depth + 1,
           child: noteRow,
         ),
@@ -1492,7 +1465,6 @@ class _NoteExplorerState extends State<NoteExplorer> {
     }
 
     for (final noteId in node.noteIds) {
-      final item = widget.controller.noteById(noteId);
       rows.add(
         ExplorerTreeItem.note(
           key: Key('notes_tree_legacy_note_row_$noteId'),
@@ -1507,31 +1479,9 @@ class _NoteExplorerState extends State<NoteExplorer> {
           selected: noteId == widget.controller.activeNoteId,
           depth: depth + 1,
           onTap: () => _handleNoteTap(noteId),
-          previewText: _previewText(noteId: noteId, note: item),
         ),
       );
     }
-  }
-
-  String _previewText({
-    required String noteId,
-    required rust_api.NoteItem? note,
-  }) {
-    final preview = note?.previewText?.trim();
-    if (preview != null && preview.isNotEmpty) {
-      return preview;
-    }
-    if (note == null) {
-      return noteId;
-    }
-    final normalized = note.content.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (normalized.isEmpty) {
-      return 'No preview available.';
-    }
-    if (normalized.length <= 120) {
-      return normalized;
-    }
-    return '${normalized.substring(0, 120)}...';
   }
 
   bool _looksLikeUuid(String value) {

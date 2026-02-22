@@ -1,4 +1,4 @@
-use lazynote_core::db::migrations::latest_version;
+use lazynote_core::db::migrations::{apply_migrations, latest_version};
 use lazynote_core::db::{open_db, open_db_in_memory, DbError};
 use rusqlite::Connection;
 use uuid::Uuid;
@@ -176,6 +176,185 @@ fn external_mappings_enforce_unique_provider_external_id() {
     );
 
     assert!(duplicate.is_err());
+}
+
+#[test]
+fn migration_9_backfills_missing_root_note_refs_for_active_notes() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    migrate_to_v8(&conn);
+
+    let note_existing = Uuid::new_v4().to_string();
+    let note_missing = Uuid::new_v4().to_string();
+    let task_atom = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO atoms (uuid, type, content) VALUES (?1, 'note', 'existing');",
+        [note_existing.as_str()],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO atoms (uuid, type, content) VALUES (?1, 'note', 'missing');",
+        [note_missing.as_str()],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO atoms (uuid, type, content) VALUES (?1, 'task', 'task row');",
+        [task_atom.as_str()],
+    )
+    .unwrap();
+
+    let folder_id = Uuid::new_v4().to_string();
+    let existing_ref_id = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO workspace_nodes (
+            node_uuid, kind, parent_uuid, atom_uuid, display_name, sort_order, is_deleted
+         ) VALUES (?1, 'folder', NULL, NULL, 'Group', 0, 0);",
+        [folder_id.as_str()],
+    )
+    .unwrap();
+    conn.execute(
+        "INSERT INTO workspace_nodes (
+            node_uuid, kind, parent_uuid, atom_uuid, display_name, sort_order, is_deleted
+         ) VALUES (?1, 'note_ref', ?2, ?3, 'ExistingRef', 0, 0);",
+        [&existing_ref_id, &folder_id, &note_existing],
+    )
+    .unwrap();
+
+    apply_migrations(&mut conn).unwrap();
+
+    assert_eq!(schema_version(&conn), latest_version());
+
+    let existing_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*)
+             FROM workspace_nodes
+             WHERE kind = 'note_ref'
+               AND atom_uuid = ?1
+               AND is_deleted = 0;",
+            [note_existing.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let missing_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*)
+             FROM workspace_nodes
+             WHERE kind = 'note_ref'
+               AND atom_uuid = ?1
+               AND is_deleted = 0;",
+            [note_missing.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    let task_count: i64 = conn
+        .query_row(
+            "SELECT COUNT(*)
+             FROM workspace_nodes
+             WHERE kind = 'note_ref'
+               AND atom_uuid = ?1
+               AND is_deleted = 0;",
+            [task_atom.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(existing_count, 1);
+    assert_eq!(missing_count, 1);
+    assert_eq!(task_count, 0);
+
+    let backfilled_parent: Option<String> = conn
+        .query_row(
+            "SELECT parent_uuid
+             FROM workspace_nodes
+             WHERE kind = 'note_ref'
+               AND atom_uuid = ?1
+               AND is_deleted = 0
+             LIMIT 1;",
+            [note_missing.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(backfilled_parent.is_none());
+}
+
+#[test]
+fn migration_9_backfill_sql_is_idempotent_on_replay() {
+    let mut conn = Connection::open_in_memory().unwrap();
+    migrate_to_v8(&conn);
+
+    let note_missing = Uuid::new_v4().to_string();
+    conn.execute(
+        "INSERT INTO atoms (uuid, type, content) VALUES (?1, 'note', 'missing');",
+        [note_missing.as_str()],
+    )
+    .unwrap();
+
+    apply_migrations(&mut conn).unwrap();
+
+    let count_after_migration: i64 = conn
+        .query_row(
+            "SELECT COUNT(*)
+             FROM workspace_nodes
+             WHERE kind = 'note_ref'
+               AND atom_uuid = ?1
+               AND is_deleted = 0;",
+            [note_missing.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    conn.execute_batch(include_str!(
+        "../src/db/migrations/0009_workspace_note_ref_backfill.sql"
+    ))
+    .unwrap();
+
+    let count_after_replay: i64 = conn
+        .query_row(
+            "SELECT COUNT(*)
+             FROM workspace_nodes
+             WHERE kind = 'note_ref'
+               AND atom_uuid = ?1
+               AND is_deleted = 0;",
+            [note_missing.as_str()],
+            |row| row.get(0),
+        )
+        .unwrap();
+
+    assert_eq!(count_after_migration, 1);
+    assert_eq!(count_after_replay, 1);
+}
+
+fn migrate_to_v8(conn: &Connection) {
+    let migrations = [
+        (1u32, include_str!("../src/db/migrations/0001_init.sql")),
+        (2u32, include_str!("../src/db/migrations/0002_tags.sql")),
+        (
+            3u32,
+            include_str!("../src/db/migrations/0003_external_mappings.sql"),
+        ),
+        (4u32, include_str!("../src/db/migrations/0004_fts.sql")),
+        (
+            5u32,
+            include_str!("../src/db/migrations/0005_note_preview.sql"),
+        ),
+        (
+            6u32,
+            include_str!("../src/db/migrations/0006_time_matrix.sql"),
+        ),
+        (
+            7u32,
+            include_str!("../src/db/migrations/0007_workspace_tree.sql"),
+        ),
+        (
+            8u32,
+            include_str!("../src/db/migrations/0008_workspace_tree_delete_policy.sql"),
+        ),
+    ];
+
+    for (version, sql) in migrations {
+        conn.execute_batch(sql).unwrap();
+        conn.execute_batch(&format!("PRAGMA user_version = {version};"))
+            .unwrap();
+    }
 }
 
 fn schema_version(conn: &Connection) -> u32 {

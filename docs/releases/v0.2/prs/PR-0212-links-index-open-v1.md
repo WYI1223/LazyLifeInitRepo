@@ -44,7 +44,7 @@ This PR operationalizes P0 items in:
 
 ## Planned File Changes
 
-- [add] `crates/lazynote_core/src/db/migrations/0009_links.sql`
+- [add] `crates/lazynote_core/src/db/migrations/0010_links.sql`
 - [add] `crates/lazynote_core/src/repo/link_repo.rs`
 - [add] `crates/lazynote_core/src/service/link_service.rs`
 - [edit] `crates/lazynote_core/src/service/note_service.rs`

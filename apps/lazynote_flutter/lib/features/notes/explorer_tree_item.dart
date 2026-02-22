@@ -17,7 +17,7 @@ class ExplorerTreeItem extends StatelessWidget {
     this.onCreateChildFolder,
     this.onDeleteFolder,
     this.onSecondaryTapDown,
-  }) : previewText = null;
+  });
 
   const ExplorerTreeItem.note({
     super.key,
@@ -25,7 +25,6 @@ class ExplorerTreeItem extends StatelessWidget {
     required this.depth,
     required this.selected,
     required this.onTap,
-    required this.previewText,
     this.onSecondaryTapDown,
   }) : expanded = false,
        canCreateChild = false,
@@ -39,7 +38,6 @@ class ExplorerTreeItem extends StatelessWidget {
   final bool expanded;
   final bool canCreateChild;
   final bool canDelete;
-  final String? previewText;
   final VoidCallback onTap;
   final VoidCallback? onCreateChildFolder;
   final VoidCallback? onDeleteFolder;
@@ -194,30 +192,14 @@ class ExplorerTreeItem extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        node.displayName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: kNotesPrimaryText,
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        previewText ?? 'No preview available.',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: kNotesSecondaryText,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    node.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: kNotesPrimaryText,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    ),
                   ),
                 ),
               ],

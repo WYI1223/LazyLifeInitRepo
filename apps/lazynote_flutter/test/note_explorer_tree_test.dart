@@ -305,6 +305,7 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const Key('notes_list_item_note-1')), findsOneWidget);
+    expect(find.text('No preview available.'), findsNothing);
   });
 
   testWidgets(
